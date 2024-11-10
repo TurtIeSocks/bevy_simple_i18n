@@ -1,0 +1,5 @@
+{
+  "_version": 1,
+  "hello": "Hello World",
+  "messages.hello": "Hello %{name}"
+}

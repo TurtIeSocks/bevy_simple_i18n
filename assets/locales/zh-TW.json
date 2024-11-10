@@ -1,0 +1,5 @@
+{
+  "_version": 1,
+  "hello": "你好世界",
+  "messages.hello": "你好，%{name}"
+}
