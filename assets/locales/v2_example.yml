@@ -45,3 +45,26 @@ messages.hello:
   th: สวัสดี, %{name}
   uk: Привіт, %{name}
   sl: Pozdravljen, %{name}
+messages.cats:
+  en: You have %{count} cats
+  zh-TW: 你有%{count}隻貓
+  es: Tienes %{count} gatos
+  fr: Vous avez %{count} chats
+  de: Du hast %{count} Katzen
+  ja: あなたは%{count}匹の猫を持っています
+  ko: '%{count}마리의 고양이가 있습니다'
+  pt: Você tem %{count} gatos
+  ru: У вас есть %{count} кошек
+  it: Hai %{count} gatti
+  tr: '%{count} kediniz var'
+  nl: Je hebt %{count} katten
+  pl: Masz %{count} kotów
+  cs: Máte %{count} koček
+  sv: Du har %{count} katter
+  da: Du har %{count} katte
+  fi: Sinulla on %{count} kissaa
+  no: Du har %{count} katter
+  hu: '%{count} macskád van'
+  th: คุณมี%{count} แมว
+  uk: У вас є %{count} кішок
+  sl: Imate %{count} mačk
