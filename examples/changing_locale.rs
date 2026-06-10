@@ -12,7 +12,7 @@ fn main() {
 }
 
 fn setup(mut commands: Commands, i18n_res: Res<I18n>) {
-    commands.spawn(Camera2d::default());
+    commands.spawn(Camera2d);
     commands
         .spawn(Node {
             width: Val::Percent(100.),
@@ -117,16 +117,16 @@ fn setup(mut commands: Commands, i18n_res: Res<I18n>) {
                                     border: UiRect::all(Val::Px(5.0)),
                                     justify_content: JustifyContent::Center,
                                     align_items: AlignItems::Center,
+                                    border_radius: BorderRadius::MAX,
                                     ..default()
                                 },
-                                BorderColor(Color::BLACK),
-                                BorderRadius::MAX,
+                                BorderColor::all(Color::BLACK),
                                 BackgroundColor(Color::srgb(0.15, 0.15, 0.15)),
                             ))
                             .with_child((
                                 Text::new(locale),
                                 TextFont {
-                                    font_size: 50.0,
+                                    font_size: FontSize::Px(50.0),
                                     ..default()
                                 },
                                 TextColor(Color::srgb(0.9, 0.9, 0.9)),
@@ -136,18 +136,16 @@ fn setup(mut commands: Commands, i18n_res: Res<I18n>) {
         });
 }
 
+#[allow(clippy::type_complexity)]
 fn button_system(
     interaction_query: Query<(&Interaction, &Children), (Changed<Interaction>, With<Button>)>,
     text_query: Query<&Text>,
     mut i18n_res: ResMut<I18n>,
 ) {
     for (interaction, children) in interaction_query.iter() {
-        match *interaction {
-            Interaction::Pressed => {
-                let text = text_query.get(children[0]).unwrap().clone().0;
-                i18n_res.set_locale(text);
-            }
-            _ => {}
+        if *interaction == Interaction::Pressed {
+            let text = text_query.get(children[0]).unwrap().0.clone();
+            i18n_res.set_locale(text);
         }
     }
 }

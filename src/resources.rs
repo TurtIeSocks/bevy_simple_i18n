@@ -1,10 +1,4 @@
-use bevy::{
-    asset::Handle,
-    ecs::{reflect::ReflectResource, system::Resource},
-    reflect::Reflect,
-    text::Font,
-    utils::hashbrown::HashMap,
-};
+use bevy::{ecs::reflect::ReflectResource, platform::collections::HashMap, prelude::*, text::Font};
 use icu_locid::Locale;
 
 /// Resource for managing the current locale and getting the available locales
@@ -17,6 +11,7 @@ use icu_locid::Locale;
 /// fn update_locale(mut i18n_res: ResMut<I18n>) {
 ///     i18n_res.set_locale("en");
 /// }
+/// ```
 #[derive(Debug, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct I18n {
@@ -110,7 +105,7 @@ impl FontManager {
         self.fonts.insert(family, font_folder);
     }
 
-    pub(crate) fn get(&self, family: &str, locale: String) -> Handle<Font> {
+    pub(crate) fn get(&self, family: &str, locale: impl Into<String>) -> Handle<Font> {
         if let Some(folder) = self.fonts.get(family) {
             bevy::log::debug!("Found font family: {}", family);
             folder.get(locale)
@@ -120,8 +115,3 @@ impl FontManager {
         }
     }
 }
-
-/// Hacky resource to signal that fonts are still loading
-#[derive(Debug, Reflect, Default, Resource)]
-#[reflect(Resource)]
-pub(crate) struct FontsLoading;

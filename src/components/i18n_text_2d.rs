@@ -1,20 +1,13 @@
-use bevy::{
-    ecs::{
-        component::{Component, ComponentHooks, StorageType},
-        reflect::ReflectComponent,
-    },
-    log::debug,
-    reflect::Reflect,
-    text::Text2d,
-};
+use bevy::prelude::*;
 
 use super::{utils::translate_by_key, I18nComponent, InterpolationType};
 
 /// Component for spawning translatable text 2d entities that are managed by `bevy_simple_i18n`
 ///
-/// It automatically inserts (or replaces) a Bevy [Text2d] component with the translated text using the provided key
+/// A Bevy [`Text2d`] component is inserted automatically (via `#[require(Text2d)]`) and kept in
+/// sync with the translated value for the provided key.
 ///
-/// Updates automatically whenever the locale is changed using the [crate::resources::I18n] resource
+/// Updates automatically whenever the locale is changed using the [`crate::resources::I18n`] resource
 ///
 /// # Example
 ///
@@ -27,19 +20,24 @@ use super::{utils::translate_by_key, I18nComponent, InterpolationType};
 /// ```
 ///
 /// ```
+/// # use bevy::prelude::*;
+/// # use bevy_simple_i18n::prelude::*;
+/// # fn system(mut commands: Commands) {
 /// // Basic usage
-/// world.spawn(I18nText2d::new("hello"));
+/// commands.spawn(I18nText2d::new("hello"));
 ///
 /// // With interpolation arguments
-/// world.spawn(I18nText2d::new("greet").with_arg("name", "Bevy User"));
+/// commands.spawn(I18nText2d::new("greet").with_arg("name", "Bevy User"));
 ///
 /// // With forced locale
 /// // overrides the global
 /// // does not update when the locale is changed
-/// world.spawn(I18nText2d::new("hello").with_locale("ja"));
+/// commands.spawn(I18nText2d::new("hello").with_locale("ja"));
+/// # }
 /// ```
-#[derive(Default, Reflect, Debug, Clone)]
+#[derive(Component, Default, Reflect, Debug, Clone)]
 #[reflect(Component)]
+#[require(Text2d)]
 pub struct I18nText2d {
     /// Translation key for i18n
     key: String,
@@ -50,10 +48,12 @@ pub struct I18nText2d {
 }
 
 impl I18nComponent for I18nText2d {
+    type Target = Text2d;
+
     fn locale(&self) -> String {
         self.locale
             .clone()
-            .unwrap_or(rust_i18n::locale().to_string())
+            .unwrap_or_else(|| rust_i18n::locale().to_string())
     }
 
     fn translate(&self) -> String {
@@ -62,7 +62,7 @@ impl I18nComponent for I18nText2d {
 }
 
 impl I18nText2d {
-    /// Creates a new [I18nText2d] component with the provided translation key
+    /// Creates a new [`I18nText2d`] component with the provided translation key
     pub fn new(str: impl Into<String>) -> Self {
         Self {
             key: str.into(),
@@ -96,24 +96,5 @@ impl I18nText2d {
             InterpolationType::Number(super::utils::f64_to_fd(value.into())),
         ));
         self
-    }
-}
-
-impl Component for I18nText2d {
-    const STORAGE_TYPE: StorageType = StorageType::Table;
-
-    fn register_component_hooks(_hooks: &mut ComponentHooks) {
-        _hooks.on_add(|mut world, entity, _| {
-            let val = world.get::<Self>(entity).unwrap().clone();
-            debug!("Adding i18n text 2d: {}", val.key);
-            if let Some(mut text) = world.get_mut::<Text2d>(entity) {
-                **text = val.translate();
-            } else {
-                world
-                    .commands()
-                    .entity(entity)
-                    .insert(Text2d::new(val.translate()));
-            }
-        });
     }
 }

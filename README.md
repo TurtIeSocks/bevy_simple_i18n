@@ -39,7 +39,7 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
-    commands.spawn(Camera2d::default());
+    commands.spawn(Camera2d);
     commands.spawn((I18nText::new("hello"), I18nFont::new("NotoSans")));
     commands.spawn((I18nNumber::new(2503.10), I18nFont::new("NotoSans")));
 }
@@ -67,6 +67,25 @@ In order to use this plugin, the following folder structure is recommended:
 ## Locale Files
 
 Locale files can technically be put anywhere in your `assets` folder and this crate should find them. Since we're just using the `rust-i18n` library, the format is the same. You can find more information on the supported formats [here](https://github.com/longbridgeapp/rust-i18n?tab=readme-ov-file#locale-file).
+
+## Asset Path & Workspace Projects
+
+This crate's build script embeds your locales (and discovers dynamic fonts) at compile time. To do so it has to locate your `assets` folder. By default it walks up from the build output directory to the cargo `target` directory and uses the sibling `assets` folder, which is correct for most single-crate projects.
+
+In a **workspace-structured project**, the build script cannot know which member crate's `assets` folder Bevy will actually load at runtime. Set the `BEVY_ASSET_PATH` environment variable to the absolute (or workspace-relative) path of the `assets` directory you load at runtime:
+
+```sh
+# one-off
+BEVY_ASSET_PATH=./crates/my_game/assets cargo run -p my_game
+```
+
+```toml
+# or persist it for the whole workspace in .cargo/config.toml
+[env]
+BEVY_ASSET_PATH = { value = "crates/my_game/assets", relative = true }
+```
+
+Make sure this is the same folder Bevy resolves at runtime — if you customize `AssetPlugin { file_path, .. }`, point `BEVY_ASSET_PATH` at the matching directory. If no assets folder is found the crate still compiles (translations and fonts are simply empty) and emits a build warning.
 
 ## Features
 
@@ -168,7 +187,7 @@ Implementing this trait for your component makes it eligible to register it and 
 
 ### `I18nComponentRegistration`
 
-This trait enables the `register_i18n_component` method on your Bevy App. Registering your components with this method will allow the plugin to automatically update the components when the locale is changed, requires your component to implement the `I18nComponent` trait. Unfortunately, this does not work with the Dynamic Font feature yet.
+This trait enables the `register_i18n_component` method on your Bevy App. Registering your components with this method will allow the plugin to automatically update the components when the locale is changed, requires your component to implement the `I18nComponent` trait. Registered components participate in the Dynamic Font feature too: pair them with an `I18nFont` and the font handle is kept in sync with the resolved locale.
 
 ```rust
   app.register_i18n_component::<I18nText>();
@@ -178,6 +197,7 @@ This trait enables the `register_i18n_component` method on your Bevy App. Regist
 
 | bevy | bevy_simple_i18n |
 | ---- | ---------------- |
+| 0.19 | 0.2              |
 | 0.15 | 0.1              |
 
 ## Credits

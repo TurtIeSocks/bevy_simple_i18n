@@ -12,7 +12,7 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
-    commands.spawn(Camera2d::default());
+    commands.spawn(Camera2d);
     commands
         .spawn(Node {
             width: Val::Percent(100.),
@@ -34,7 +34,7 @@ fn setup(mut commands: Commands) {
                 // You can still insert a TextFont component though
                 // Keep in mind that the "font" field will be overridden by the I18nFont component
                 TextFont {
-                    font_size: 40.0,
+                    font_size: FontSize::Px(40.0),
                     ..default()
                 },
             ));
@@ -55,19 +55,19 @@ fn setup(mut commands: Commands) {
             ));
         });
 
-        // Basic usage of the Text2d implementation
-        commands.spawn((
-            // I18nText2d component with key "text2d"
-            I18nText2d::new("text2d"),
-            // Dynamic font component with font family "NotoSans" that auto loads font files based on the set locale
-            I18nFont::new("NotoSans"),
-            // You can still insert a TextFont component though
-            // Keep in mind that the "font" field will be overridden by the I18nFont component
-            TextFont {
-                font_size: 40.0,
-                ..default()
-            },
-            // Since we're using Text2d, we add a Transform to set its position
-            Transform::from_xyz(300., 300., 0.)
-        ));
+    // Basic usage of the Text2d implementation
+    commands.spawn((
+        // I18nText2d component with key "text2d"
+        I18nText2d::new("text2d"),
+        // Dynamic font component with font family "NotoSans" that auto loads font files based on the set locale
+        I18nFont::new("NotoSans"),
+        // You can still insert a TextFont component though
+        // Keep in mind that the "font" field will be overridden by the I18nFont component
+        TextFont {
+            font_size: FontSize::Px(40.0),
+            ..default()
+        },
+        // Since we're using Text2d, we add a Transform to set its position
+        Transform::from_xyz(300., 300., 0.),
+    ));
 }
