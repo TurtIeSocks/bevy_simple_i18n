@@ -1,0 +1,14 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bevy-web",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-lc",
+        "cd web && exec \"$HOME/.cargo/bin/trunk\" serve --port 8180 --address 127.0.0.1"
+      ],
+      "port": 8180
+    }
+  ]
+}

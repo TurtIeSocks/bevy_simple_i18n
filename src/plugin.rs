@@ -1,36 +1,24 @@
 use std::path::Path;
 
-use bevy::{
-    app::{App, Plugin, PreStartup, Update},
-    asset::{AssetServer, Handle},
-    ecs::{
-        component::Component,
-        schedule::{
-            common_conditions::{resource_changed, resource_exists, resource_removed},
-            IntoSystemConfigs,
-        },
-        system::{Commands, Query, Res, ResMut},
-    },
-    text::{Font, TextFont},
-    ui::widget::Text,
-};
+use bevy::prelude::*;
 
 use crate::{
-    components::{I18nFont, I18nNumber, I18nText},
-    prelude::{I18nComponent, I18nText2d},
-    resources::{FontFolder, FontManager, FontsLoading, I18n},
+    components::{I18nFont, I18nText, I18nText2d},
+    prelude::I18nComponent,
+    resources::{FontFolder, FontManager, I18n},
     FONT_FAMILIES,
 };
 
 /// Initializes the `bevy_simple_i18n` plugin
 ///
 /// # Example
-/// ```
+/// ```no_run
 /// use bevy::prelude::*;
 /// use bevy_simple_i18n::prelude::*;
 ///
 /// fn main() {
 ///     App::new()
+///         .add_plugins(DefaultPlugins)
 ///         .add_plugins(I18nPlugin)
 ///         .run();
 /// }
@@ -38,91 +26,81 @@ use crate::{
 pub struct I18nPlugin;
 
 impl Plugin for I18nPlugin {
-    fn build(&self, app: &mut bevy::prelude::App) {
+    fn build(&self, app: &mut App) {
         app.init_resource::<I18n>()
             .init_resource::<FontManager>()
-            .init_resource::<FontsLoading>()
+            .register_type::<I18n>()
+            .register_type::<I18nText>()
+            .register_type::<I18nText2d>()
+            .register_type::<I18nFont>()
             .add_systems(PreStartup, load_dynamic_fonts)
             .register_i18n_component::<I18nText>()
-            .register_i18n_component::<I18nText2d>()
-            .register_i18n_component::<I18nNumber>()
-            .add_systems(
-                Update,
-                monitor_font_loading.run_if(resource_exists::<FontsLoading>),
-            );
+            .register_i18n_component::<I18nText2d>();
+
+        #[cfg(feature = "numbers")]
+        app.register_type::<crate::components::I18nNumber>()
+            .register_i18n_component::<crate::components::I18nNumber>();
     }
 }
 
 pub trait I18nComponentRegistration {
     /// Registers an i18n component for automatic translation updates
-    fn register_i18n_component<T: I18nComponent + Component>(&mut self) -> &mut Self;
+    fn register_i18n_component<T: I18nComponent>(&mut self) -> &mut Self;
 }
 
 impl I18nComponentRegistration for App {
-    fn register_i18n_component<T: I18nComponent + Component>(&mut self) -> &mut Self {
-        self.add_systems(
-            Update,
-            (
-                update_text_translations::<T>.run_if(resource_removed::<FontsLoading>),
-                update_text_translations::<T>.run_if(resource_changed::<I18n>),
-            ),
-        )
+    fn register_i18n_component<T: I18nComponent>(&mut self) -> &mut Self {
+        self.add_systems(Update, update_translations::<T>)
     }
 }
 
-/// Auto updates the translations for components that have the [I18nComponent] trait
-/// and have been registered with the Bevy [App] using the [register_i18n_component] method
-/// whenever the [I18n] resource changes
-fn update_text_translations<T: I18nComponent + Component>(
-    font_manager: bevy::ecs::system::Res<FontManager>,
-    mut text_query: Query<(&mut Text, &mut TextFont, Option<&I18nFont>, &T)>,
+/// Keeps the translated text (and dynamic font) of every registered [`I18nComponent`] in sync.
+///
+/// Thanks to change detection this is cheap to run every frame: an entity's target text is only
+/// rewritten when the entity's i18n component was just added/changed, or when the global locale
+/// changed (the [`I18n`] resource was mutated).
+#[allow(clippy::type_complexity)]
+fn update_translations<T: I18nComponent>(
+    i18n: Res<I18n>,
+    font_manager: Res<FontManager>,
+    mut query: Query<(
+        &mut T::Target,
+        Option<&mut TextFont>,
+        Option<&I18nFont>,
+        Ref<T>,
+    )>,
 ) {
-    bevy::log::debug!("Updating translations");
-    for (mut text, mut text_font, dyn_font, key) in text_query.iter_mut() {
-        text.0 = key.translate();
-        if let Some(dyn_font) = dyn_font {
-            text_font.font = font_manager.get(&dyn_font.0, key.locale());
+    let locale_changed = i18n.is_changed();
+    for (mut target, text_font, dyn_font, key) in query.iter_mut() {
+        if !locale_changed && !key.is_changed() {
+            continue;
+        }
+        bevy::log::debug!("Updating translation for locale {}", key.locale());
+        **target = key.translate();
+        if let (Some(mut text_font), Some(dyn_font)) = (text_font, dyn_font) {
+            // Bevy 0.19: TextFont::font is a `FontSource` enum; Handle<Font> converts via From.
+            text_font.font = font_manager.get(&dyn_font.0, key.locale()).into();
         }
     }
 }
 
-/// Loads the dynamic fonts specified in the [FONT_FAMILIES] constant that's generated by the build script
-///
-/// TODO: Make the loading state more controllable
-fn load_dynamic_fonts(
-    mut font_manager: ResMut<FontManager>,
-    asset_server: Res<bevy::asset::AssetServer>,
-) {
+/// Loads the dynamic fonts specified in the [`FONT_FAMILIES`] constant that's generated by the
+/// build script.
+fn load_dynamic_fonts(mut font_manager: ResMut<FontManager>, asset_server: Res<AssetServer>) {
     for dyn_font in FONT_FAMILIES.iter() {
         bevy::log::debug!("Loading dynamic font family: {}", dyn_font.family);
-        let mut font_folder = FontFolder::default();
-        font_folder.fallback = asset_server.load(Path::new(dyn_font.path).join("fallback.ttf"));
+        let mut font_folder = FontFolder {
+            fallback: asset_server.load(Path::new(dyn_font.path).join("fallback.ttf")),
+            ..Default::default()
+        };
         for font in dyn_font.locales.iter() {
             bevy::log::debug!("Loading font: {}", font);
             let locale = font.split('.').next().expect("Locale is required");
             let path = Path::new(dyn_font.path).join(font);
-            let handler: Handle<Font> = asset_server.load(path);
-            font_folder.fonts.insert(locale.to_string(), handler);
+            font_folder
+                .fonts
+                .insert(locale.to_string(), asset_server.load(path));
         }
         font_manager.insert(dyn_font.family.to_string(), font_folder);
     }
-}
-
-/// Monitors the font loading state and removes the [FontsLoading] resource when all fonts are loaded
-///
-/// TODO: Make the loading state more controllable
-fn monitor_font_loading(
-    mut commands: Commands,
-    font_manager: Res<FontManager>,
-    asset_server: Res<AssetServer>,
-) {
-    for folder in font_manager.fonts.values() {
-        for font in folder.fonts.values() {
-            if !asset_server.is_loaded(font.id()) {
-                return;
-            }
-        }
-    }
-    commands.remove_resource::<FontsLoading>();
-    bevy::log::debug!("All fonts loaded");
 }

@@ -5,42 +5,35 @@ use super::InterpolationType;
 #[cfg(feature = "numbers")]
 pub(super) fn f64_to_fd(value: f64) -> fixed_decimal::FixedDecimal {
     fixed_decimal::FixedDecimal::try_from_f64(value, fixed_decimal::FloatPrecision::Floating)
-        .expect(format!("Failed to parse FixedDecimal from f64: {}", value).as_str())
+        .unwrap_or_else(|err| panic!("Failed to parse FixedDecimal from f64 {value}: {err}"))
 }
 
 #[cfg(feature = "numbers")]
-pub(super) fn resolve_locale(locale: &String, label: impl ToString) -> icu_locid::Locale {
+pub(super) fn resolve_locale(locale: &str, label: impl std::fmt::Display) -> icu_locid::Locale {
     locale
         .parse()
-        .expect(format!("Invalid locale: {} for key: {}", locale, label.to_string()).as_str())
+        .unwrap_or_else(|err| panic!("Invalid locale: {locale} for key: {label}: {err}"))
 }
 
 #[cfg(feature = "numbers")]
 pub(super) fn get_formatter(
-    locale: &String,
-    label: impl ToString,
+    locale: &str,
+    label: impl std::fmt::Display,
 ) -> icu_decimal::FixedDecimalFormatter {
-    let label_string = label.to_string();
-    let locale = resolve_locale(locale, label);
-    let locale_string = locale.to_string();
-    icu_decimal::FixedDecimalFormatter::try_new(&locale.into(), Default::default()).expect(
-        format!(
-            "Failed to create FixedDecimalFormatter for number: {} with locale: {}",
-            label_string, locale_string,
-        )
-        .as_str(),
-    )
+    let locale = resolve_locale(locale, &label);
+    icu_decimal::FixedDecimalFormatter::try_new(&locale.clone().into(), Default::default())
+        .unwrap_or_else(|err| {
+            panic!("Failed to create FixedDecimalFormatter for {label} with locale {locale}: {err}")
+        })
 }
 
 pub(super) fn translate_by_key(
-    locale: &String,
-    key: &String,
-    args: &Vec<(String, InterpolationType)>,
+    locale: &str,
+    key: &str,
+    args: &[(String, InterpolationType)],
 ) -> String {
-    let key = key.as_str();
-
     #[cfg(feature = "numbers")]
-    let fdf = super::utils::get_formatter(locale, key);
+    let fdf = get_formatter(locale, key);
 
     let (patterns, values): (Vec<&str>, Vec<String>) = args
         .iter()
@@ -55,6 +48,5 @@ pub(super) fn translate_by_key(
         .unzip();
     let translated = t!(key, locale = locale);
 
-    let val = rust_i18n::replace_patterns(&translated, patterns.as_slice(), values.as_slice());
-    val
+    rust_i18n::replace_patterns(&translated, patterns.as_slice(), values.as_slice())
 }
