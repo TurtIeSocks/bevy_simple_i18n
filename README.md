@@ -7,7 +7,12 @@ An opinionated but dead simple internationalization library for the Bevy game en
 
 ## Project Status
 
-This project wraps [rust-i18n](https://github.com/longbridgeapp/rust-i18n) library and is therefore not very "Bevy" like. The `rust-i18n` library embeds all of your locales via macros at compile time, while this is incredibly convenient, it isn't always desirable for game development. I have attempted to wrap the library in the most Bevy way I could but the long term goal is to create a more Bevy-like internationalization library, so this is mostly a proof of concept and you should expect breaking changes.
+As of 0.4, this crate is fully native Bevy: locale files are regular Bevy **assets**
+loaded at runtime through the `AssetServer`, locale state lives in an ECS resource, and
+translations **hot reload**. There is no build script, no compile-time embedding, and no
+global state. (Earlier versions wrapped the `rust-i18n` crate, which baked every locale
+file into the binary at compile time — see the [migration guide](#migrating-from-03)
+below.)
 
 ## [Demo](https://turtiesocks.github.io/bevy_simple_i18n/)
 
@@ -19,21 +24,13 @@ This project wraps [rust-i18n](https://github.com/longbridgeapp/rust-i18n) libra
 cargo add bevy_simple_i18n
 ```
 
-### Cargo.toml
-
-Add the following to your `Cargo.toml`:
-
-```toml
-bevy_simple_i18n = { version = "*" }
-```
-
 ### main.rs
 
 ```rust
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(I18nPlugin)
+        .add_plugins(I18nPlugin::default())
         .add_systems(Startup, setup)
         .run();
 }
@@ -45,55 +42,75 @@ fn setup(mut commands: Commands) {
 }
 ```
 
-## File Structure
+### The manifest
 
-In order to use this plugin, the following folder structure is recommended:
+The plugin loads a small RON manifest (default: `assets/locales/i18n.ron`) that declares
+your locale files and dynamic font families. It exists because wasm and Android builds
+cannot list asset directories — so the manifest is the one place that says what to load:
+
+```ron
+(
+    // Optional. The starting locale (defaults to "en"). Ignored after you call
+    // `I18n::set_locale` yourself.
+    default_locale: "en",
+
+    // Optional. Locales to try when a key is missing everywhere else.
+    // Empty by default: a missing key renders the key itself.
+    fallback: [],
+
+    // Locale files, relative to this manifest's directory.
+    // LIST ORDER IS MERGE ORDER: later files win on conflicting keys.
+    files: [
+        "en.json",
+        "ja.json",
+        "v2_example.yml",
+    ],
+
+    // Dynamic font families. `dir` is relative to the asset root; the file stem is
+    // the locale it serves ("fallback" marks the family's fallback font).
+    fonts: [
+        (
+            family: "NotoSans",
+            dir: "fonts/NotoSans",
+            files: ["fallback.ttf", "ja.ttf", "zh-TW.ttf"],
+        ),
+    ],
+)
+```
+
+Custom manifest location: `I18nPlugin::with_manifest("i18n/manifest.ron")`.
+
+## File Structure
 
 ```ts
 .
 ├── assets
 │   ├── locales
-│   │   ├── {locale_file}.yml
+│   │   ├── i18n.ron            // the manifest
 │   │   ├── {locale_file}.json
-│   │   └── {locale_file}.toml
+│   │   ├── {locale_file}.yml   // feature "yaml" (default on)
+│   │   └── {locale_file}.toml  // feature "toml" (default on)
 │   └── fonts
 │       └── {font_name}
 │           ├── fallback.ttf
-│           ├── {locale}.ttf
-│           └── {locale}.otf
+│           └── {locale}.ttf
 └── Cargo.toml
 ```
 
 ## Locale Files
 
-Locale files can technically be put anywhere in your `assets` folder and this crate should find them. Since we're just using the `rust-i18n` library, the format is the same. You can find more information on the supported formats [here](https://github.com/longbridgeapp/rust-i18n?tab=readme-ov-file#locale-file).
+Both classic formats are supported, in JSON, YAML and TOML:
 
-## Asset Path & Workspace Projects
+**v1** — one file per locale; the file stem is the locale (`en.json`, `app.ja.yml`):
 
-This crate's build script embeds your locales (and discovers dynamic fonts) at compile time. To do so it has to locate your `assets` folder. By default it walks up from the build output directory to the cargo `target` directory and uses the sibling `assets` folder, which is correct for most single-crate projects.
-
-In a **workspace-structured project**, the build script cannot know which member crate's `assets` folder Bevy will actually load at runtime. Set the `BEVY_ASSET_PATH` environment variable to the absolute (or workspace-relative) path of the `assets` directory you load at runtime:
-
-```sh
-# one-off
-BEVY_ASSET_PATH=./crates/my_game/assets cargo run -p my_game
+```json
+{
+  "hello": "Hello World",
+  "messages.hello": "Hello, %{name}"
+}
 ```
 
-```toml
-# or persist it for the whole workspace in .cargo/config.toml
-[env]
-BEVY_ASSET_PATH = { value = "crates/my_game/assets", relative = true }
-```
-
-Make sure this is the same folder Bevy resolves at runtime — if you customize `AssetPlugin { file_path, .. }`, point `BEVY_ASSET_PATH` at the matching directory. If no assets folder is found the crate still compiles (translations and fonts are simply empty) and emits a build warning.
-
-## Features
-
-### Text Translations
-
-To translate text, you can use the `I18nText` component. This component takes a string as an argument and will automatically translate it based on the current locale.
-
-Translation File:
+**v2** — one file for many locales, marked by `_version: 2`:
 
 ```yml
 _version: 2
@@ -103,7 +120,12 @@ hello:
   ja: こんにちは世界
 ```
 
-Bevy code:
+Nested maps flatten to dot keys (`a: { b: x }` == `"a.b": x`). If several files define
+the same key for the same locale, the file listed **later in the manifest wins**.
+
+## Features
+
+### Text Translations
 
 ```rust
 commands.spawn(I18nText::new("hello"));
@@ -111,33 +133,11 @@ commands.spawn(I18nText::new("hello"));
 
 ### Number Localization
 
-To localize numbers, you can use the `I18nNumber` component. This component will automatically localize the number based on the current locale.
-
-Bevy code:
-
 ```rust
 commands.spawn(I18nNumber::new(2350.54));
 ```
 
 ### Interpolation
-
-Interpolation is supported using the `I18nText` component. You can interpolate variables by adding tuple (key, value) arguments to the `I18nText` component.
-
-Translation File:
-
-```yml
-_version: 2
-messages.hello:
-  en: Hello, %{name}
-  zh-TW: 你好，%{name}
-  ja: こんにちは、%{name}
-messages.cats:
-  en: You have %{count} cats
-  zh-TW: 你有%{count}隻貓
-  ja: あなたは%{count}匹の猫を持っています
-```
-
-Bevy code:
 
 ```rust
 commands.spawn(I18nText::new("messages.hello").with_arg("name", "world"));
@@ -146,32 +146,19 @@ commands.spawn(I18nText::new("messages.cats").with_num_arg("count", 20));
 
 ### Dynamic Fonts
 
-Dynamic fonts enable this plugin to automatically switch between different fonts based on the current locale. For example, since Japanese and English languages have different character sets, you may want to use different fonts for each language. In order to make use of dynamic font, you must follow the file structure mentioned above.
-
-Folder setup:
-
-```ts
-.
-├── assets
-│   └── fonts
-│       └── NotoSans
-│           ├── fallback.ttf
-│           ├── ja.ttf
-│           └── zh.ttf
-└── Cargo.toml
-```
-
-We would then spawn the dynamic font using:
+Declare a font family in the manifest (see above), then:
 
 ```rust
-commands.spawn((I18nText::new("hello"), I18nFont::new("NotoSans")))
+commands.spawn((I18nText::new("hello"), I18nFont::new("NotoSans")));
 ```
 
-When the locale is set to `ja`, the font will be set to `ja.ttf`. If the locale is set to `zh-TW`, the font automatically load `zh.ttf`, since `zh-TW` does not have a font file. If the locale is set to any other locale, Bevy will load `fallback.ttf`.
+When the locale is `ja`, `ja.ttf` is used. A locale without its own file walks up the
+locale chain (`zh-TW` → `zh`) and finally lands on `fallback.ttf`.
 
 ### Automatic Text Re-Rendering
 
-When the locale is changed, the plugin will automatically update all `I18nText` components to reflect the new locale. No boilerplate code is required, other than changing the locale using the `I18n` resource.
+Change the locale on the [`I18n`] resource and every i18n entity re-renders — no
+boilerplate:
 
 ```rust
 fn change_locale(mut i18n: ResMut<I18n>) {
@@ -179,25 +166,93 @@ fn change_locale(mut i18n: ResMut<I18n>) {
 }
 ```
 
+Locale resolution on lookup follows the BCP-47 truncation chain: `zh-Hant-CN` tries
+`zh-Hant-CN`, then `zh-Hant`, then `zh`, then the manifest's `fallback` locales. A
+complete miss renders the key itself (and logs a warning), so untranslated text is
+visible instead of invisible.
+
+### Hot Reload
+
+Enable Bevy's `file_watcher` cargo feature and edit a locale file while the game runs —
+all live text re-translates instantly. Great for translators: no recompile, no restart.
+(Not available on wasm, where Bevy has no file watcher.)
+
+You can also edit translations from code (in-game translation tools, downloaded
+language packs):
+
+```rust
+fn tweak(mut files: ResMut<Assets<TranslationFile>>) {
+    for (_, file) in files.iter_mut() {
+        file.set_translation("en", "hello", "Hi there!");
+    }
+}
+```
+
+### Load Readiness
+
+Assets load asynchronously. Text spawned before the translations arrive renders its key
+and self-heals once loading completes. If you want a loading screen instead, gate on
+[`I18n::ready`]:
+
+```rust
+fn loading_screen_done(i18n: Res<I18n>) -> bool {
+    i18n.ready()
+}
+```
+
 ## Traits
 
 ### `I18nComponent`
 
-Implementing this trait for your component makes it eligible to register it and enable automatic re-translations. See [Example Implementation](./src/components/i18n_number.rs) for an example.
+Implement this for your own component to drive any `String`-carrying text component
+from a translation key. Both methods receive the [`I18n`] resource:
+
+```rust
+impl I18nComponent for MyLabel {
+    type Target = Text;
+    fn locale<'a>(&'a self, i18n: &'a I18n) -> &'a str {
+        self.locale.as_deref().unwrap_or_else(|| i18n.current())
+    }
+    fn translate(&self, i18n: &I18n) -> String {
+        i18n.translate(self.locale(i18n), &self.key).unwrap_or(&self.key).to_string()
+    }
+}
+```
 
 ### `I18nComponentRegistration`
 
-This trait enables the `register_i18n_component` method on your Bevy App. Registering your components with this method will allow the plugin to automatically update the components when the locale is changed, requires your component to implement the `I18nComponent` trait. Registered components participate in the Dynamic Font feature too: pair them with an `I18nFont` and the font handle is kept in sync with the resolved locale.
+Registers your component for automatic re-translation (and dynamic font support):
 
 ```rust
-  app.register_i18n_component::<I18nText>();
+app.register_i18n_component::<MyLabel>();
 ```
+
+## Migrating from 0.3
+
+1. Add a manifest at `assets/locales/i18n.ron` listing your locale files (see
+   [The manifest](#the-manifest)). Your locale files themselves need no changes.
+2. `I18nPlugin` → `I18nPlugin::default()`.
+3. Delete any `BEVY_ASSET_PATH` setup — it no longer exists. Workspace projects need no
+   special configuration anymore.
+4. If you implemented `I18nComponent` yourself: `locale()` and `translate()` now take
+   `&I18n`.
+5. Note: locale files merge in **manifest order** (deterministic). Previously the merge
+   order across files was filesystem-dependent; if you relied on a specific override
+   order, encode it in the manifest's `files` list.
+
+## Cargo Features
+
+| Feature   | Default | Effect                                   |
+| --------- | ------- | ---------------------------------------- |
+| `numbers` | yes     | `I18nNumber` + `with_num_arg` (icu4x)    |
+| `yaml`    | yes     | `.yml` / `.yaml` locale files            |
+| `toml`    | yes     | `.toml` locale files                     |
 
 ## Bevy support table
 
 | bevy | bevy_simple_i18n |
 | ---- | ---------------- |
-| 0.19 | 0.2              |
+| 0.19 | 0.3, 0.4         |
 | 0.15 | 0.1              |
 
 ## Credits
