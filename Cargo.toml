@@ -51,6 +51,7 @@ bevy = { version = "0.19" }
 [[example]]
 name = "basic"
 path = "examples/basic.rs"
+required-features = ["numbers"]
 
 [[example]]
 name = "changing_locale"

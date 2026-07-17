@@ -54,6 +54,13 @@ pub(crate) fn parse_file(stem: &str, ext: &str, bytes: &[u8]) -> Result<Table, P
 }
 
 /// Merges `src` into `dst`; on conflicting `(locale, key)` the `src` value wins.
+///
+/// Divergence from rust-i18n: this merges FLAT keys (union + later-wins), while
+/// rust-i18n deep-merges the JSON trees before flattening — there, a later scalar
+/// replaces an entire earlier subtree (`{"menu": "Menu"}` after
+/// `{"menu": {"file": ...}}` would delete `menu.file`). With flat merging both keys
+/// survive. Only observable when two files define the same key as a scalar in one
+/// and a subtree in the other; keeping both is the less surprising behavior.
 pub(crate) fn merge_into(dst: &mut Table, src: Table) {
     for (locale, keys) in src {
         dst.entry(locale).or_default().extend(keys);

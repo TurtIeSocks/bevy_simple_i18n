@@ -8,7 +8,7 @@
 use std::path::{Path, PathBuf};
 
 use bevy::{
-    asset::{io::Reader, AssetLoader, LoadContext},
+    asset::{io::AssetSourceId, io::Reader, AssetLoader, AssetPath, LoadContext},
     prelude::*,
 };
 
@@ -71,6 +71,10 @@ pub struct I18nManifest {
     /// `LoadedWithDependencies` only once every translation file is in.
     pub(crate) files: Vec<Handle<TranslationFile>>,
     pub(crate) fonts: Vec<FontFamilyEntry>,
+    /// The asset source the manifest was loaded from (`assets/`, `embedded://`, …).
+    /// Font paths resolve against this source so a manifest from a custom source
+    /// stays self-contained.
+    pub(crate) source: AssetSourceId<'static>,
 }
 
 /// One `fonts:` entry of the manifest.
@@ -140,19 +144,11 @@ impl AssetLoader for TranslationFileLoader {
         Ok(TranslationFile { table })
     }
 
-    fn extensions(&self) -> &[&str] {
-        // Typed loads (`load_context.load::<TranslationFile>`) select this loader by
-        // asset type, so sharing ".json" etc. with other crates' loaders is fine.
-        &[
-            "json",
-            #[cfg(feature = "yaml")]
-            "yml",
-            #[cfg(feature = "yaml")]
-            "yaml",
-            #[cfg(feature = "toml")]
-            "toml",
-        ]
-    }
+    // No `extensions()` override, deliberately. This crate only ever loads
+    // translation files TYPED (`load::<TranslationFile>`), which selects the loader
+    // by asset type. Claiming bare "json"/"yml"/"toml" would hijack other crates'
+    // UNTYPED loads (`load_untyped`, `load_folder`) for those extensions, where
+    // bevy picks the last-registered loader with no warning.
 }
 
 #[derive(Default, TypePath)]
@@ -173,7 +169,10 @@ impl AssetLoader for I18nManifestLoader {
         reader.read_to_end(&mut bytes).await?;
         let manifest: ManifestRon = ron::de::from_bytes(&bytes)?;
 
-        // `files` entries are relative to the manifest's own directory.
+        // `files` entries are relative to the manifest's own directory, and stay on
+        // the manifest's asset source (`embedded://locales/i18n.ron` pulls its files
+        // from `embedded://locales/`, not from the default `assets/` root).
+        let source = load_context.path().source().clone_owned();
         let dir: PathBuf = load_context
             .path()
             .path()
@@ -183,7 +182,10 @@ impl AssetLoader for I18nManifestLoader {
         let files = manifest
             .files
             .iter()
-            .map(|file| load_context.load::<TranslationFile>(dir.join(file)))
+            .map(|file| {
+                let path = AssetPath::from(dir.join(file)).with_source(source.clone());
+                load_context.load::<TranslationFile>(path)
+            })
             .collect();
 
         Ok(I18nManifest {
@@ -191,10 +193,11 @@ impl AssetLoader for I18nManifestLoader {
             fallback: manifest.fallback,
             files,
             fonts: manifest.fonts,
+            source,
         })
     }
 
-    fn extensions(&self) -> &[&str] {
-        &["ron"]
-    }
+    // No `extensions()` override — same reasoning as TranslationFileLoader: the
+    // manifest is always loaded typed, and claiming bare "ron" would hijack other
+    // crates' untyped .ron loads (scenes, bevy_common_assets, …).
 }

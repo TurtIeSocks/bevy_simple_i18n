@@ -59,7 +59,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failing the build.
 - Removed dependencies: `rust-i18n`, `cargo-emit`. Removed: `build.rs`.
 
-## [0.2.0] - Unreleased
+## [0.3.0] - 2026-06-19
 
 ### Changed
 

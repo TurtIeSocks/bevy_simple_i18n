@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use bevy::asset::{AssetLoadFailedEvent, AssetPath};
 use bevy::prelude::*;
 
 use crate::{
@@ -112,13 +113,16 @@ fn update_translations<T: I18nComponent>(
     mut query: Query<(
         &mut T::Target,
         Option<&mut TextFont>,
-        Option<&I18nFont>,
+        Option<Ref<I18nFont>>,
         Ref<T>,
     )>,
 ) {
     let i18n_changed = i18n.is_changed();
     for (mut target, text_font, dyn_font, key) in query.iter_mut() {
-        if !i18n_changed && !key.is_changed() {
+        // Also react to a just-inserted/changed I18nFont, so adding a dynamic font to
+        // an existing entity applies it without waiting for the next locale change.
+        let font_changed = dyn_font.as_ref().is_some_and(|font| font.is_changed());
+        if !i18n_changed && !key.is_changed() && !font_changed {
             continue;
         }
         bevy::log::debug!("Updating translation for locale {}", key.locale(&i18n));
@@ -131,11 +135,14 @@ fn update_translations<T: I18nComponent>(
 }
 
 /// Rebuilds the [`I18n`] translation table (and the dynamic-font registry) whenever the
-/// manifest or any translation file is added, modified (hot reload) or finishes loading.
+/// manifest or any translation file is added, modified (hot reload) or finishes loading,
+/// and surfaces load failures with actionable logs.
 #[allow(clippy::too_many_arguments)]
 fn sync_translations(
     mut manifest_events: MessageReader<AssetEvent<I18nManifest>>,
     mut file_events: MessageReader<AssetEvent<TranslationFile>>,
+    mut manifest_failures: MessageReader<AssetLoadFailedEvent<I18nManifest>>,
+    mut file_failures: MessageReader<AssetLoadFailedEvent<TranslationFile>>,
     manifest_handle: Option<Res<ManifestHandle>>,
     manifests: Res<Assets<I18nManifest>>,
     files: Res<Assets<TranslationFile>>,
@@ -151,11 +158,39 @@ fn sync_translations(
                 | AssetEvent::LoadedWithDependencies { .. }
         )
     }
-    // `.count()`-free: both readers must be drained even when the first already matched,
-    // otherwise stale events retrigger next frame.
-    let manifest_relevant = manifest_events.read().any(is_relevant);
-    let files_relevant = file_events.read().any(is_relevant);
-    if !manifest_relevant && !files_relevant {
+    // Fold instead of `.any()`: readers must be FULLY drained even after a match,
+    // otherwise leftover same-frame events retrigger a redundant rebuild next frame.
+    let mut relevant = manifest_events
+        .read()
+        .fold(false, |hit, e| hit | is_relevant(e));
+    relevant = file_events
+        .read()
+        .fold(relevant, |hit, e| hit | is_relevant(e));
+
+    // A failed dependency is terminal in bevy_asset (no retry), so treat it as
+    // completion: log something actionable and let `ready()` latch rather than
+    // leaving loading screens gated on `I18n::ready()` hanging forever.
+    for failure in manifest_failures.read() {
+        bevy::log::error!(
+            "bevy_simple_i18n: failed to load the i18n manifest `{}`: {}. Create it, or \
+             point `I18nPlugin::with_manifest` at the right path (relative to the asset \
+             root, e.g. \"locales/i18n.ron\"). Continuing without translations.",
+            failure.path,
+            failure.error
+        );
+        i18n.mark_ready();
+    }
+    for failure in file_failures.read() {
+        bevy::log::error!(
+            "bevy_simple_i18n: failed to load translation file `{}` (listed in the i18n \
+             manifest): {}. Its translations are skipped.",
+            failure.path,
+            failure.error
+        );
+        relevant = true;
+    }
+
+    if !relevant {
         return;
     }
     let Some(manifest_handle) = manifest_handle else {
@@ -173,8 +208,13 @@ fn sync_translations(
         }
     }
 
-    // `ready` latches on: a hot reload never flips a running game back to "loading".
-    let ready = i18n.ready() || asset_server.is_loaded_with_dependencies(&manifest_handle.0);
+    // `ready` latches on at any TERMINAL load state — fully loaded, or failed
+    // dependencies (degraded but done). A hot reload never flips a running game
+    // back to "loading".
+    let ready = i18n.ready()
+        || asset_server
+            .get_recursive_dependency_load_state(&manifest_handle.0)
+            .is_some_and(|state| state.is_loaded() || state.is_failed());
     bevy::log::debug!(
         "Rebuilt i18n table: {} locale(s), ready: {ready}",
         table.len()
@@ -186,13 +226,19 @@ fn sync_translations(
         ready,
     );
 
-    // Dynamic fonts: `asset_server.load` deduplicates by path, so rebuilding the
-    // registry on every sync is cheap.
+    // Dynamic fonts: rebuild the registry from scratch so families removed from a
+    // hot-reloaded manifest don't linger. `asset_server.load` deduplicates by path,
+    // so re-requesting surviving fonts is cheap.
+    font_manager.fonts.clear();
     for entry in &manifest.fonts {
         let mut folder = FontFolder::default();
         for file in &entry.files {
             let stem = file.rsplit_once('.').map(|(stem, _)| stem).unwrap_or(file);
-            let handle = asset_server.load(Path::new(&entry.dir).join(file));
+            // Keep the manifest's asset source (e.g. `embedded://`): `dir` is relative
+            // to the asset root of whichever source the manifest came from.
+            let path = AssetPath::from(Path::new(&entry.dir).join(file))
+                .with_source(manifest.source.clone());
+            let handle = asset_server.load(path);
             if stem == "fallback" {
                 folder.fallback = handle;
             } else {

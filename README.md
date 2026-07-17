@@ -78,7 +78,10 @@ cannot list asset directories — so the manifest is the one place that says wha
 )
 ```
 
-Custom manifest location: `I18nPlugin::with_manifest("i18n/manifest.ron")`.
+Custom manifest location: `I18nPlugin::with_manifest("i18n/manifest.ron")`. Manifest
+paths are **asset paths, relative to the asset root** — for a manifest on disk at
+`assets/locales/i18n.ron`, the asset path is `locales/i18n.ron` (omit the `assets/`
+prefix).
 
 ## File Structure
 
@@ -234,8 +237,9 @@ app.register_i18n_component::<MyLabel>();
 2. `I18nPlugin` → `I18nPlugin::default()`.
 3. Delete any `BEVY_ASSET_PATH` setup — it no longer exists. Workspace projects need no
    special configuration anymore.
-4. If you implemented `I18nComponent` yourself: `locale()` and `translate()` now take
-   `&I18n`.
+4. If you implemented `I18nComponent` yourself, both methods changed signature:
+   `fn locale(&self) -> String` is now `fn locale<'a>(&'a self, i18n: &'a I18n) -> &'a str`,
+   and `fn translate(&self) -> String` is now `fn translate(&self, i18n: &I18n) -> String`.
 5. Note: locale files merge in **manifest order** (deterministic). Previously the merge
    order across files was filesystem-dependent; if you relied on a specific override
    order, encode it in the manifest's `files` list.

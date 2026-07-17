@@ -60,7 +60,10 @@ src/
            CONSCIOUS DIVERGENCES (documented): (1) strip "_version" key in v1 files
            (rust-i18n leaks it as a translation); (2) parse failure = log error + skip
            file (rust-i18n: compile-time panic); (3) merge order = manifest file order,
-           deterministic (rust-i18n: unspecified glob order).
+           deterministic (rust-i18n: unspecified glob order); (4) merge is a FLAT-key
+           union (later wins per key) instead of rust-i18n's pre-flatten JSON deep
+           merge — a later scalar no longer deletes an earlier same-named subtree;
+           only observable on cross-file scalar-vs-subtree conflicts.
 
   interpolate.rs (or fold into parse.rs)       ← NEW
     ← was rust_i18n::replace_patterns

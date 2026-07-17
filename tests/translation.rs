@@ -55,6 +55,10 @@ fn spawn_text(app: &mut App, bundle: impl Bundle) -> Entity {
     id
 }
 
+// Several vectors assert values that v2_example.yml (later in the manifest) overrides;
+// they only hold when the YAML file actually loads, hence the `yaml` feature gates.
+
+#[cfg(feature = "yaml")]
 #[test]
 fn translates_with_a_forced_locale() {
     let mut app = ready_app();
@@ -65,6 +69,7 @@ fn translates_with_a_forced_locale() {
     assert_eq!(text(&app, ja), "こんにちは世界");
 }
 
+#[cfg(feature = "yaml")]
 #[test]
 fn updates_when_the_global_locale_changes() {
     let mut app = ready_app();
@@ -79,6 +84,7 @@ fn updates_when_the_global_locale_changes() {
     assert_eq!(text(&app, id), "こんにちは世界");
 }
 
+#[cfg(feature = "yaml")]
 #[test]
 fn text2d_updates_when_the_global_locale_changes() {
     let mut app = ready_app();
@@ -93,6 +99,7 @@ fn text2d_updates_when_the_global_locale_changes() {
     assert_eq!(app.world().get::<Text2d>(id).unwrap().0, "こんにちは世界");
 }
 
+#[cfg(feature = "yaml")]
 #[test]
 fn interpolates_arguments() {
     let mut app = ready_app();
@@ -108,6 +115,7 @@ fn interpolates_arguments() {
 
 // ------------------------- rust-i18n parity vectors -------------------------
 
+#[cfg(feature = "yaml")]
 #[test]
 fn locale_truncation_chain_resolves_parent_locales() {
     let mut app = ready_app();
@@ -141,6 +149,7 @@ fn no_implicit_fallback_to_default_locale() {
     assert_eq!(text(&app, id), "text2d");
 }
 
+#[cfg(feature = "yaml")]
 #[test]
 fn later_manifest_files_override_earlier_ones() {
     // en.json says "Hello World" (capital W); v2_example.yml, listed later in the
@@ -152,6 +161,7 @@ fn later_manifest_files_override_earlier_ones() {
     assert_eq!(text(&app, id), "Hello world");
 }
 
+#[cfg(feature = "yaml")]
 #[test]
 fn unmatched_interpolation_pattern_stays_verbatim() {
     let mut app = ready_app();
@@ -160,6 +170,7 @@ fn unmatched_interpolation_pattern_stays_verbatim() {
     assert_eq!(text(&app, id), "Hello, %{name}");
 }
 
+#[cfg(feature = "yaml")]
 #[test]
 fn available_locales_are_sorted_and_complete() {
     let app = ready_app();
@@ -183,6 +194,7 @@ fn default_locale_is_en_before_assets_arrive() {
     assert_eq!(app.world().resource::<I18n>().current(), "en");
 }
 
+#[cfg(feature = "yaml")]
 #[test]
 fn text_spawned_before_assets_load_self_heals() {
     // An entity spawned while the table is still empty renders its key, then
@@ -199,6 +211,7 @@ fn text_spawned_before_assets_load_self_heals() {
     assert_eq!(text(&app, id), "こんにちは世界");
 }
 
+#[cfg(feature = "yaml")]
 #[test]
 fn modified_translation_assets_retranslate_live_text() {
     // Drives the same code path a file_watcher hot reload takes: mutating a
@@ -221,6 +234,7 @@ fn modified_translation_assets_retranslate_live_text() {
     assert_eq!(text(&app, id), "アップデート済み");
 }
 
+#[cfg(feature = "numbers")]
 #[test]
 fn numbers_localize_per_locale() {
     // Characterization tests for the icu formatting pipeline (guards the icu 2.x bump).
@@ -232,6 +246,7 @@ fn numbers_localize_per_locale() {
     assert_eq!(text(&app, de), "24.501,2");
 }
 
+#[cfg(all(feature = "numbers", feature = "yaml"))]
 #[test]
 fn number_interpolation_arguments_are_localized() {
     let mut app = ready_app();

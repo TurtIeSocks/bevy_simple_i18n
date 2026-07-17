@@ -129,9 +129,25 @@ impl I18n {
         self.locales = locales;
         self.fallback = fallback;
         self.ready = ready;
-        if !self.explicit && !default_locale.is_empty() {
-            self.current = default_locale.to_string();
+        if !self.explicit && !default_locale.is_empty() && self.current != default_locale {
+            // Same validation as set_locale: a typo'd manifest default_locale must not
+            // poison `current` (the numbers formatter panics on unparseable locales).
+            if default_locale.parse::<Locale>().is_ok() {
+                self.current = default_locale.to_string();
+            } else {
+                bevy::log::error!(
+                    "Invalid `default_locale` in i18n manifest: {default_locale:?}; \
+                     keeping {:?}",
+                    self.current
+                );
+            }
         }
+    }
+
+    /// Latches readiness even when loading failed terminally (missing manifest),
+    /// so `ready()`-gated loading screens don't hang forever.
+    pub(crate) fn mark_ready(&mut self) {
+        self.ready = true;
     }
 }
 
