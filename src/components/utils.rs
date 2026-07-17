@@ -2,13 +2,16 @@ use super::InterpolationType;
 use crate::prelude::I18n;
 
 #[cfg(feature = "numbers")]
-pub(super) fn f64_to_fd(value: f64) -> fixed_decimal::FixedDecimal {
-    fixed_decimal::FixedDecimal::try_from_f64(value, fixed_decimal::FloatPrecision::Floating)
-        .unwrap_or_else(|err| panic!("Failed to parse FixedDecimal from f64 {value}: {err}"))
+pub(super) fn f64_to_fd(value: f64) -> fixed_decimal::Decimal {
+    fixed_decimal::Decimal::try_from_f64(value, fixed_decimal::FloatPrecision::RoundTrip)
+        .unwrap_or_else(|err| panic!("Failed to parse Decimal from f64 {value}: {err}"))
 }
 
 #[cfg(feature = "numbers")]
-pub(super) fn resolve_locale(locale: &str, label: impl std::fmt::Display) -> icu_locid::Locale {
+pub(super) fn resolve_locale(
+    locale: &str,
+    label: impl std::fmt::Display,
+) -> icu_locale_core::Locale {
     locale
         .parse()
         .unwrap_or_else(|err| panic!("Invalid locale: {locale} for key: {label}: {err}"))
@@ -18,12 +21,11 @@ pub(super) fn resolve_locale(locale: &str, label: impl std::fmt::Display) -> icu
 pub(super) fn get_formatter(
     locale: &str,
     label: impl std::fmt::Display,
-) -> icu_decimal::FixedDecimalFormatter {
+) -> icu_decimal::DecimalFormatter {
     let locale = resolve_locale(locale, &label);
-    icu_decimal::FixedDecimalFormatter::try_new(&locale.clone().into(), Default::default())
-        .unwrap_or_else(|err| {
-            panic!("Failed to create FixedDecimalFormatter for {label} with locale {locale}: {err}")
-        })
+    icu_decimal::DecimalFormatter::try_new((&locale).into(), Default::default()).unwrap_or_else(
+        |err| panic!("Failed to create DecimalFormatter for {label} with locale {locale}: {err}"),
+    )
 }
 
 pub(super) fn translate_by_key(

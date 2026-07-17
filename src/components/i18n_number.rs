@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use fixed_decimal::FixedDecimal;
+use fixed_decimal::Decimal;
 
 use super::{utils, I18nComponent};
 
@@ -30,7 +30,7 @@ use super::{utils, I18nComponent};
 #[require(Text)]
 pub struct I18nNumber {
     #[reflect(ignore)]
-    pub(crate) fixed_decimal: FixedDecimal,
+    pub(crate) fixed_decimal: Decimal,
     /// Locale for this specific translation, `None` to use the global locale
     pub(crate) locale: Option<String>,
 }

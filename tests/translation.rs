@@ -222,6 +222,30 @@ fn modified_translation_assets_retranslate_live_text() {
 }
 
 #[test]
+fn numbers_localize_per_locale() {
+    // Characterization tests for the icu formatting pipeline (guards the icu 2.x bump).
+    let mut app = ready_app();
+    let en = spawn_text(&mut app, I18nNumber::new(24501.2).with_locale("en"));
+    let de = spawn_text(&mut app, I18nNumber::new(24501.2).with_locale("de"));
+
+    assert_eq!(text(&app, en), "24,501.2");
+    assert_eq!(text(&app, de), "24.501,2");
+}
+
+#[test]
+fn number_interpolation_arguments_are_localized() {
+    let mut app = ready_app();
+    let id = spawn_text(
+        &mut app,
+        I18nText::new("messages.cats")
+            .with_num_arg("count", 2000.3)
+            .with_locale("en"),
+    );
+
+    assert_eq!(text(&app, id), "You have 2,000.3 cats");
+}
+
+#[test]
 fn dynamic_font_family_is_applied_from_the_manifest() {
     let mut app = ready_app();
     let id = spawn_text(

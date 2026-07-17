@@ -1,5 +1,5 @@
 use bevy::{ecs::reflect::ReflectResource, platform::collections::HashMap, prelude::*, text::Font};
-use icu_locid::Locale;
+use icu_locale_core::Locale;
 
 use crate::parse::Table;
 

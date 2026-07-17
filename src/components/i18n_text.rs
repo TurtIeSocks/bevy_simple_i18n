@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 #[cfg(feature = "numbers")]
-use fixed_decimal::FixedDecimal;
+use fixed_decimal::Decimal;
 
 use super::{utils::translate_by_key, I18nComponent};
 
@@ -104,5 +104,5 @@ impl I18nText {
 pub(crate) enum InterpolationType {
     String(String),
     #[cfg(feature = "numbers")]
-    Number(#[reflect(ignore)] FixedDecimal),
+    Number(#[reflect(ignore)] Decimal),
 }
