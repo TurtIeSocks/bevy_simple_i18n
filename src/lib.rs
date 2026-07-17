@@ -1,10 +1,12 @@
+mod assets;
 mod components;
+mod interpolate;
+mod parse;
 mod plugin;
 mod resources;
 
-include!(concat!(env!("OUT_DIR"), "/bevy_simple_i18n.rs"));
-
 pub mod prelude {
+    pub use crate::assets::{FontFamilyEntry, I18nManifest, TranslationFile};
     pub use crate::components::*;
     pub use crate::plugin::*;
     pub use crate::resources::*;

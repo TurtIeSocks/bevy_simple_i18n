@@ -5,7 +5,7 @@ use bevy_simple_i18n::prelude::*;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins(I18nPlugin)
+        .add_plugins(I18nPlugin::default())
         .add_systems(Startup, setup)
         .add_systems(Update, button_system)
         .run();

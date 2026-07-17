@@ -53,14 +53,12 @@ pub struct I18nText {
 impl I18nComponent for I18nText {
     type Target = Text;
 
-    fn locale(&self) -> String {
-        self.locale
-            .clone()
-            .unwrap_or_else(|| rust_i18n::locale().to_string())
+    fn locale<'a>(&'a self, i18n: &'a crate::prelude::I18n) -> &'a str {
+        self.locale.as_deref().unwrap_or_else(|| i18n.current())
     }
 
-    fn translate(&self) -> String {
-        translate_by_key(&self.locale(), &self.key, &self.args)
+    fn translate(&self, i18n: &crate::prelude::I18n) -> String {
+        translate_by_key(i18n, self.locale(i18n), &self.key, &self.args)
     }
 }
 

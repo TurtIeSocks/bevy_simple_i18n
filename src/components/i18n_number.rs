@@ -38,14 +38,12 @@ pub struct I18nNumber {
 impl I18nComponent for I18nNumber {
     type Target = Text;
 
-    fn locale(&self) -> String {
-        self.locale
-            .clone()
-            .unwrap_or_else(|| rust_i18n::locale().to_string())
+    fn locale<'a>(&'a self, i18n: &'a crate::prelude::I18n) -> &'a str {
+        self.locale.as_deref().unwrap_or_else(|| i18n.current())
     }
 
-    fn translate(&self) -> String {
-        utils::get_formatter(&self.locale(), &self.fixed_decimal)
+    fn translate(&self, i18n: &crate::prelude::I18n) -> String {
+        utils::get_formatter(self.locale(i18n), &self.fixed_decimal)
             .format_to_string(&self.fixed_decimal)
     }
 }

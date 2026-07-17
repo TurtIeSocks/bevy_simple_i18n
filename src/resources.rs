@@ -1,7 +1,16 @@
 use bevy::{ecs::reflect::ReflectResource, platform::collections::HashMap, prelude::*, text::Font};
 use icu_locid::Locale;
 
-/// Resource for managing the current locale and getting the available locales
+use crate::parse::Table;
+
+/// Resource for managing the current locale and looking up translations.
+///
+/// This is the single source of truth: the current locale, the merged translation
+/// table (built from the loaded [`TranslationFile`](crate::prelude::TranslationFile)
+/// assets), the available locales and the fallback chain all live here. Mutating it
+/// (switching locale, or the sync system rebuilding the table after an asset load /
+/// hot reload) triggers change detection, which re-translates every registered i18n
+/// component.
 ///
 /// # Example
 /// ```
@@ -15,39 +24,113 @@ use icu_locid::Locale;
 #[derive(Debug, Resource, Reflect)]
 #[reflect(Resource)]
 pub struct I18n {
-    locales: Vec<String>,
+    /// Currently active locale.
     current: String,
+    /// Locales present in the merged table, sorted ascending (byte-lexicographic).
+    locales: Vec<String>,
+    /// `locale -> (flat key -> text)`, merged in manifest order (later files win).
+    #[reflect(ignore)]
+    translations: Table,
+    /// Explicit fallback locales from the manifest, tried in order after the
+    /// requested locale's truncation chain. Empty by default (rust-i18n parity:
+    /// a miss echoes the key, it does NOT silently fall back to the default locale).
+    #[reflect(ignore)]
+    fallback: Vec<String>,
+    /// True once the manifest and all its translation files finished loading.
+    ready: bool,
+    /// Set when the user called [`set_locale`](Self::set_locale); prevents the
+    /// manifest's `default_locale` from overriding an explicit choice.
+    #[reflect(ignore)]
+    explicit: bool,
+}
+
+impl Default for I18n {
+    fn default() -> Self {
+        Self {
+            current: "en".to_string(),
+            locales: Vec::new(),
+            translations: Table::default(),
+            fallback: Vec::new(),
+            ready: false,
+            explicit: false,
+        }
+    }
 }
 
 impl I18n {
+    /// Sets the active locale. Invalid BCP-47 identifiers are rejected with an error
+    /// log. Every registered i18n component re-translates automatically.
     pub fn set_locale(&mut self, locale: impl Into<String>) {
         let next_locale: String = locale.into();
         if let Err(err) = next_locale.parse::<Locale>() {
             bevy::log::error!("Invalid locale: {}", err);
             return;
         }
-        rust_i18n::set_locale(&next_locale);
         bevy::log::debug!("Locale changed from {} to {}", self.current, next_locale);
         self.current = next_locale;
+        self.explicit = true;
     }
 
+    /// The currently active locale.
     pub fn current(&self) -> &str {
         &self.current
     }
 
+    /// All locales present in the loaded translation files, sorted ascending.
     pub fn locales(&self) -> &[String] {
         &self.locales
     }
-}
 
-impl Default for I18n {
-    fn default() -> Self {
-        Self {
-            current: rust_i18n::locale().to_string(),
-            locales: rust_i18n::available_locales!()
-                .into_iter()
-                .map(|s| s.into())
-                .collect(),
+    /// True once the manifest and all of its translation files have loaded.
+    ///
+    /// Components spawned earlier self-heal: they render their key first and
+    /// re-translate when the table arrives.
+    pub fn ready(&self) -> bool {
+        self.ready
+    }
+
+    /// Looks up `key` for `locale`.
+    ///
+    /// Resolution order (rust-i18n parity): exact locale, then the BCP-47
+    /// truncation chain (`zh-Hant-CN` → `zh-Hant` → `zh`, trimming `-x`
+    /// private-use tails), then the explicit fallback locales. `None` on a
+    /// complete miss — callers render the key verbatim.
+    pub fn translate(&self, locale: &str, key: &str) -> Option<&str> {
+        if let Some(text) = self.lookup(locale, key) {
+            return Some(text);
+        }
+        let mut chain = locale;
+        while let Some(index) = chain.rfind('-') {
+            chain = chain[..index].trim_end_matches("-x");
+            if let Some(text) = self.lookup(chain, key) {
+                return Some(text);
+            }
+        }
+        self.fallback
+            .iter()
+            .find_map(|fallback| self.lookup(fallback, key))
+    }
+
+    fn lookup(&self, locale: &str, key: &str) -> Option<&str> {
+        self.translations.get(locale)?.get(key).map(String::as_str)
+    }
+
+    /// Replaces the translation table (called by the asset sync system).
+    pub(crate) fn apply_table(
+        &mut self,
+        table: Table,
+        default_locale: &str,
+        fallback: Vec<String>,
+        ready: bool,
+    ) {
+        let mut locales: Vec<String> = table.keys().cloned().collect();
+        locales.sort();
+        self.translations = table;
+        self.locales = locales;
+        self.fallback = fallback;
+        self.ready = ready;
+        if !self.explicit && !default_locale.is_empty() {
+            self.current = default_locale.to_string();
         }
     }
 }

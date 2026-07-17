@@ -25,7 +25,7 @@ fn main() {
                     ..default()
                 }),
         )
-        .add_plugins(I18nPlugin)
+        .add_plugins(I18nPlugin::default())
         .add_systems(Startup, setup)
         .add_systems(Update, button_system)
         .run();

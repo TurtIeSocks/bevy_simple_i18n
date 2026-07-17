@@ -1,6 +1,5 @@
-use rust_i18n::t;
-
 use super::InterpolationType;
+use crate::prelude::I18n;
 
 #[cfg(feature = "numbers")]
 pub(super) fn f64_to_fd(value: f64) -> fixed_decimal::FixedDecimal {
@@ -28,6 +27,7 @@ pub(super) fn get_formatter(
 }
 
 pub(super) fn translate_by_key(
+    i18n: &I18n,
     locale: &str,
     key: &str,
     args: &[(String, InterpolationType)],
@@ -46,7 +46,22 @@ pub(super) fn translate_by_key(
             (k.as_str(), value)
         })
         .unzip();
-    let translated = t!(key, locale = locale);
 
-    rust_i18n::replace_patterns(&translated, patterns.as_slice(), values.as_slice())
+    // rust-i18n parity: a complete miss renders the key verbatim, and interpolation
+    // still applies to it.
+    let translated = match i18n.translate(locale, key) {
+        Some(text) => text,
+        None => {
+            if i18n.ready() {
+                bevy::log::warn!("Missing translation for key `{key}` (locale `{locale}`)");
+            } else {
+                bevy::log::debug!(
+                    "Translation for key `{key}` requested before locale assets loaded"
+                );
+            }
+            key
+        }
+    };
+
+    crate::interpolate::interpolate(translated, &patterns, &values)
 }

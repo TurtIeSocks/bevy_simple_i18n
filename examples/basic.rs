@@ -5,8 +5,8 @@ use bevy_simple_i18n::prelude::*;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        // Add the base plugin
-        .add_plugins(I18nPlugin)
+        // Add the base plugin (loads the manifest at assets/locales/i18n.ron)
+        .add_plugins(I18nPlugin::default())
         .add_systems(Startup, setup)
         .run();
 }
