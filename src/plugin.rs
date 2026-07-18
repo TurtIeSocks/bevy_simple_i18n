@@ -83,6 +83,9 @@ impl Plugin for I18nPlugin {
             .register_i18n_component::<I18nText>()
             .register_i18n_component::<I18nText2d>();
 
+        #[cfg(feature = "detect")]
+        app.add_systems(PreStartup, detect_system_locale);
+
         #[cfg(feature = "numbers")]
         app.register_type::<crate::components::I18nNumber>()
             .register_i18n_component::<crate::components::I18nNumber>();
@@ -130,6 +133,30 @@ fn update_translations<T: I18nComponent>(
         if let (Some(mut text_font), Some(dyn_font)) = (text_font, dyn_font) {
             // Bevy 0.19: TextFont::font is a `FontSource` enum; Handle<Font> converts via From.
             text_font.font = font_manager.get(&dyn_font.0, key.locale(&i18n)).into();
+        }
+    }
+}
+
+/// Detects the system/device locale once at startup and stages it on [`I18n`].
+///
+/// It is applied when the translation table loads — and only if the game ships that
+/// locale (or a parent of it); otherwise the manifest's `default_locale` wins. A later
+/// explicit [`I18n::set_locale`] always overrides it.
+#[cfg(feature = "detect")]
+fn detect_system_locale(mut i18n: ResMut<I18n>) {
+    let Some(raw) = bevy_device_lang::get_lang() else {
+        bevy::log::debug!("No system locale detected");
+        return;
+    };
+    // Normalize platform quirks (`en_US`) and validate: an unparseable tag must not
+    // reach the icu number formatter, which panics on invalid locales.
+    match raw.replace('_', "-").parse::<icu_locale_core::Locale>() {
+        Ok(locale) => {
+            bevy::log::debug!("Detected system locale: {locale}");
+            i18n.set_detected(locale.to_string());
+        }
+        Err(err) => {
+            bevy::log::warn!("Ignoring unparseable system locale {raw:?}: {err}");
         }
     }
 }

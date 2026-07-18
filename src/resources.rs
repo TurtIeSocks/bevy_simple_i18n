@@ -42,6 +42,10 @@ pub struct I18n {
     /// manifest's `default_locale` from overriding an explicit choice.
     #[reflect(ignore)]
     explicit: bool,
+    /// System/device locale detected at startup (feature `detect`). Applied when the
+    /// translation table loads, but only if the game actually ships that locale.
+    #[reflect(ignore)]
+    detected: Option<String>,
 }
 
 impl Default for I18n {
@@ -53,6 +57,7 @@ impl Default for I18n {
             fallback: Vec::new(),
             ready: false,
             explicit: false,
+            detected: None,
         }
     }
 }
@@ -129,7 +134,19 @@ impl I18n {
         self.locales = locales;
         self.fallback = fallback;
         self.ready = ready;
-        if !self.explicit && !default_locale.is_empty() && self.current != default_locale {
+        if self.explicit {
+            return;
+        }
+        // Precedence for the implicit locale: detected system locale (only when the
+        // game actually ships it, so a fr-FR device with an en/ja-only game doesn't
+        // render every key raw) > manifest default_locale > existing value ("en").
+        if let Some(detected) = self
+            .detected
+            .clone()
+            .filter(|detected| self.is_supported(detected))
+        {
+            self.current = detected;
+        } else if !default_locale.is_empty() && self.current != default_locale {
             // Same validation as set_locale: a typo'd manifest default_locale must not
             // poison `current` (the numbers formatter panics on unparseable locales).
             if default_locale.parse::<Locale>().is_ok() {
@@ -144,10 +161,95 @@ impl I18n {
         }
     }
 
+    /// True when `locale` (or a parent on its truncation chain) has any translations.
+    fn is_supported(&self, locale: &str) -> bool {
+        if self.translations.contains_key(locale) {
+            return true;
+        }
+        let mut chain = locale;
+        while let Some(index) = chain.rfind('-') {
+            chain = chain[..index].trim_end_matches("-x");
+            if self.translations.contains_key(chain) {
+                return true;
+            }
+        }
+        false
+    }
+
     /// Latches readiness even when loading failed terminally (missing manifest),
     /// so `ready()`-gated loading screens don't hang forever.
     pub(crate) fn mark_ready(&mut self) {
         self.ready = true;
+    }
+
+    /// Stores the detected system locale (validated + normalized by the caller).
+    pub(crate) fn set_detected(&mut self, locale: String) {
+        self.detected = Some(locale);
+    }
+
+    /// The system/device locale detected at startup, if any (feature `detect`).
+    pub fn detected(&self) -> Option<&str> {
+        self.detected.as_deref()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parse::Table;
+
+    fn table(locales: &[&str]) -> Table {
+        locales
+            .iter()
+            .map(|l| {
+                (
+                    l.to_string(),
+                    [("hello".to_string(), format!("hello-{l}"))].into(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn detected_locale_wins_over_manifest_default_when_shipped() {
+        let mut i18n = I18n::default();
+        i18n.set_detected("ja".to_string());
+        i18n.apply_table(table(&["en", "ja"]), "en", Vec::new(), true);
+        assert_eq!(i18n.current(), "ja");
+    }
+
+    #[test]
+    fn detected_regional_locale_is_kept_when_its_parent_is_shipped() {
+        // Table only ships "en", device says "en-US": keep the full tag (regional
+        // number formatting) — lookups resolve to "en" via the truncation chain.
+        let mut i18n = I18n::default();
+        i18n.set_detected("en-US".to_string());
+        i18n.apply_table(table(&["en", "ja"]), "ja", Vec::new(), true);
+        assert_eq!(i18n.current(), "en-US");
+    }
+
+    #[test]
+    fn unshipped_detected_locale_falls_back_to_manifest_default() {
+        let mut i18n = I18n::default();
+        i18n.set_detected("fr".to_string());
+        i18n.apply_table(table(&["en", "ja"]), "ja", Vec::new(), true);
+        assert_eq!(i18n.current(), "ja");
+    }
+
+    #[test]
+    fn explicit_set_locale_beats_detection() {
+        let mut i18n = I18n::default();
+        i18n.set_locale("zh-TW");
+        i18n.set_detected("ja".to_string());
+        i18n.apply_table(table(&["en", "ja", "zh-TW"]), "en", Vec::new(), true);
+        assert_eq!(i18n.current(), "zh-TW");
+    }
+
+    #[test]
+    fn invalid_manifest_default_locale_is_ignored() {
+        let mut i18n = I18n::default();
+        i18n.apply_table(table(&["en"]), "not a locale!", Vec::new(), true);
+        assert_eq!(i18n.current(), "en");
     }
 }
 

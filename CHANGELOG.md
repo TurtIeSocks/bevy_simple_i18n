@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`DecimalFormatter`). Number formatting output is unchanged.
 - New crate features: `yaml` and `toml` (both default-on) gate the respective locale
   file formats; JSON and the RON manifest are always available.
+- **System-locale auto-detection** (feature `detect`, default on): the device locale
+  (desktop, iOS, Android, wasm via `bevy_device_lang`) becomes the starting locale
+  when the game ships it (or a parent locale); precedence is explicit `set_locale` >
+  detected locale > manifest `default_locale`.
 
 ### Breaking changes
 

@@ -16,10 +16,12 @@ exclude = ["assets/"]
 members = ["web"]
 
 [features]
-default = ["numbers", "yaml", "toml"]
+default = ["numbers", "yaml", "toml", "detect"]
 numbers = ["fixed_decimal", "icu_decimal", "fixed_decimal/ryu"]
 yaml = ["dep:serde_yaml"]
 toml = ["dep:serde_toml"]
+# Detect the system/device locale at startup (iOS/Android/wasm/desktop)
+detect = ["dep:bevy_device_lang"]
 
 [dependencies]
 bevy = { version = "0.19", default-features = false, features = [
@@ -40,6 +42,9 @@ ron = "0.12"
 serde_yaml = { version = "0.9", optional = true }
 serde_toml = { version = "1", package = "toml", optional = true }
 thiserror = "2"
+
+# bevy-independent (jni/objc2/web-sys per platform), so it can't lag bevy releases
+bevy_device_lang = { version = "0.6", optional = true }
 
 fixed_decimal = { version = "0.7", optional = true }
 # `alloc` gates DecimalFormatter::format_to_string in icu_decimal 2.x

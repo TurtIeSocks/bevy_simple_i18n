@@ -174,6 +174,16 @@ Locale resolution on lookup follows the BCP-47 truncation chain: `zh-Hant-CN` tr
 complete miss renders the key itself (and logs a warning), so untranslated text is
 visible instead of invisible.
 
+### Locale Auto-Detection
+
+With the `detect` feature (default on), the system/device locale is detected at
+startup — on desktop, iOS, Android and wasm (via `bevy_device_lang`). It is used as
+the starting locale **only if your game ships it** (or a parent of it: a `de-AT`
+device with a `de` locale file uses `de-AT`); otherwise the manifest's
+`default_locale` applies. Calling `I18n::set_locale` (e.g. restoring the user's
+saved choice) always wins over detection. The raw detected tag is available via
+`I18n::detected()`.
+
 ### Hot Reload
 
 Enable Bevy's `file_watcher` cargo feature and edit a locale file while the game runs —
@@ -246,11 +256,12 @@ app.register_i18n_component::<MyLabel>();
 
 ## Cargo Features
 
-| Feature   | Default | Effect                                   |
-| --------- | ------- | ---------------------------------------- |
-| `numbers` | yes     | `I18nNumber` + `with_num_arg` (icu4x)    |
-| `yaml`    | yes     | `.yml` / `.yaml` locale files            |
-| `toml`    | yes     | `.toml` locale files                     |
+| Feature   | Default | Effect                                        |
+| --------- | ------- | --------------------------------------------- |
+| `numbers` | yes     | `I18nNumber` + `with_num_arg` (icu4x)         |
+| `yaml`    | yes     | `.yml` / `.yaml` locale files                 |
+| `toml`    | yes     | `.toml` locale files                          |
+| `detect`  | yes     | system-locale auto-detect (`bevy_device_lang`) |
 
 ## Bevy support table
 
