@@ -1,5 +1,5 @@
 use bevy::prelude::*;
-use fixed_decimal::FixedDecimal;
+use fixed_decimal::Decimal;
 
 use super::{utils, I18nComponent};
 
@@ -30,7 +30,7 @@ use super::{utils, I18nComponent};
 #[require(Text)]
 pub struct I18nNumber {
     #[reflect(ignore)]
-    pub(crate) fixed_decimal: FixedDecimal,
+    pub(crate) fixed_decimal: Decimal,
     /// Locale for this specific translation, `None` to use the global locale
     pub(crate) locale: Option<String>,
 }
@@ -38,14 +38,12 @@ pub struct I18nNumber {
 impl I18nComponent for I18nNumber {
     type Target = Text;
 
-    fn locale(&self) -> String {
-        self.locale
-            .clone()
-            .unwrap_or_else(|| rust_i18n::locale().to_string())
+    fn locale<'a>(&'a self, i18n: &'a crate::prelude::I18n) -> &'a str {
+        self.locale.as_deref().unwrap_or_else(|| i18n.current())
     }
 
-    fn translate(&self) -> String {
-        utils::get_formatter(&self.locale(), &self.fixed_decimal)
+    fn translate(&self, i18n: &crate::prelude::I18n) -> String {
+        utils::get_formatter(self.locale(i18n), &self.fixed_decimal)
             .format_to_string(&self.fixed_decimal)
     }
 }

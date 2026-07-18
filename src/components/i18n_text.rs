@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 #[cfg(feature = "numbers")]
-use fixed_decimal::FixedDecimal;
+use fixed_decimal::Decimal;
 
 use super::{utils::translate_by_key, I18nComponent};
 
@@ -48,19 +48,31 @@ pub struct I18nText {
     args: Vec<(String, InterpolationType)>,
     /// Locale for this specific translation, `None` to use the global locale
     pub(crate) locale: Option<String>,
+    /// Plural count: resolves the key to its CLDR plural form and injects `%{count}`
+    #[cfg(feature = "plurals")]
+    #[reflect(ignore)]
+    count: Option<Decimal>,
 }
 
 impl I18nComponent for I18nText {
     type Target = Text;
 
-    fn locale(&self) -> String {
-        self.locale
-            .clone()
-            .unwrap_or_else(|| rust_i18n::locale().to_string())
+    fn locale<'a>(&'a self, i18n: &'a crate::prelude::I18n) -> &'a str {
+        self.locale.as_deref().unwrap_or_else(|| i18n.current())
     }
 
-    fn translate(&self) -> String {
-        translate_by_key(&self.locale(), &self.key, &self.args)
+    fn translate(&self, i18n: &crate::prelude::I18n) -> String {
+        #[cfg(feature = "plurals")]
+        if let Some(count) = &self.count {
+            return super::utils::translate_plural(
+                i18n,
+                self.locale(i18n),
+                &self.key,
+                &self.args,
+                count,
+            );
+        }
+        translate_by_key(i18n, self.locale(i18n), &self.key, &self.args)
     }
 }
 
@@ -71,7 +83,27 @@ impl I18nText {
             key: str.into(),
             args: vec![],
             locale: None,
+            #[cfg(feature = "plurals")]
+            count: None,
         }
+    }
+
+    /// Sets the plural count: the key resolves to its plural sub-key (exact integer
+    /// `key.0`, CLDR category `key.one`/`key.few`/…, then `key.other`, then the bare
+    /// key), and `%{count}` becomes available as a localized interpolation argument.
+    ///
+    /// ```json
+    /// // en.json
+    /// {
+    ///     "cats.0": "You have no cats",
+    ///     "cats.one": "You have %{count} cat",
+    ///     "cats.other": "You have %{count} cats"
+    /// }
+    /// ```
+    #[cfg(feature = "plurals")]
+    pub fn with_count(mut self, count: impl Into<f64>) -> Self {
+        self.count = super::utils::try_f64_to_fd(count.into());
+        self
     }
 
     /// Set the locale for this specific translation
@@ -106,5 +138,5 @@ impl I18nText {
 pub(crate) enum InterpolationType {
     String(String),
     #[cfg(feature = "numbers")]
-    Number(#[reflect(ignore)] FixedDecimal),
+    Number(#[reflect(ignore)] Decimal),
 }

@@ -59,24 +59,30 @@ jobs:
       - name: Build examples
         run: cargo build --examples
 
-  # test:
-  #   name: Tests
-  #   strategy:
-  #     # Tests are most likely to have OS-specific behavior
-  #     matrix:
-  #       os: [ubuntu-latest, windows-latest, macOS-latest]
+  test:
+    name: Tests
+    strategy:
+      # Tests are most likely to have OS-specific behavior
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
 
-  #   runs-on: ${{ matrix.os }}
-  #   steps:
-  #     - name: Checkout sources
-  #       uses: actions/checkout@v3
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
 
-  #     - name: Install stable toolchain
-  #       uses: dtolnay/rust-toolchain@stable
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
 
-  #     - name: Install Linux dependencies
-  #       if: ${{ matrix.os == 'ubuntu-latest' }}
-  #       run: sudo apt-get install --no-install-recommends libwayland-dev libxkbcommon-dev
+      - name: Install Linux dependencies
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: sudo apt-get update; sudo apt-get install pkg-config libx11-dev libasound2-dev libudev-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libwayland-dev libxkbcommon-dev
 
-  #     - name: Run cargo test
-  #       run: cargo test
+      # The parity guarantees (rust-i18n-compatible lookup, formats, interpolation,
+      # icu formatting) all live in tests — they must run in CI.
+      - name: Run cargo test (all features)
+        run: cargo test --all-features
+
+      - name: Run cargo test (no default features)
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: cargo test --no-default-features

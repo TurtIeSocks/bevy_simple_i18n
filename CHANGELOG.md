@@ -5,7 +5,70 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - Unreleased
+## [0.4.0] - Unreleased
+
+### Changed
+
+- **Dropped `rust-i18n`: locale files are now real Bevy assets loaded at runtime.** The
+  build script (and its compile-time embedding of every locale file into the binary) is
+  gone. Translations load through the `AssetServer` like any other asset, driven by a
+  small RON manifest (`assets/locales/i18n.ron` by default) that lists the locale files
+  and dynamic font families. The manifest replaces directory scanning because wasm and
+  Android builds cannot enumerate asset folders.
+- **Hot reload.** With Bevy's `file_watcher` feature enabled, editing a locale file
+  re-translates all live text instantly. `TranslationFile::set_translation` drives the
+  same path programmatically (e.g. for in-game translation tooling).
+- **Runtime language packs.** Because nothing is baked into the binary anymore, shipping
+  additional or corrected translations is now a pure asset change — no recompile.
+- The `I18n` resource is the single source of truth for locale state (current locale,
+  merged translation table, available locales, fallback chain). The rust-i18n global
+  locale is gone, along with an entire class of desync bugs.
+- Translation lookups keep rust-i18n's exact observable behavior, pinned by tests:
+  BCP-47 truncation fallback (`zh-Hant-CN` → `zh-Hant` → `zh`, `-x` tails trimmed), a
+  complete miss renders the key verbatim, no implicit fallback to the default locale
+  (opt in via the manifest's `fallback` list), `%{name}` interpolation semantics
+  (first match wins, unmatched patterns stay verbatim), sorted `locales()` list.
+  Both locale file formats (v1 per-locale files, v2 `_version: 2`) are still supported
+  in JSON, YAML and TOML.
+- Migrated the icu stack to ICU4X 2.x: `icu_locid` → `icu_locale_core`,
+  `fixed_decimal 0.5` → `0.7` (`Decimal`), `icu_decimal 1.5` → `2.x`
+  (`DecimalFormatter`). Number formatting output is unchanged.
+- New crate features: `yaml` and `toml` (both default-on) gate the respective locale
+  file formats; JSON and the RON manifest are always available.
+- **System-locale auto-detection** (feature `detect`, default on): the device locale
+  (desktop, iOS, Android, wasm via `bevy_device_lang`) becomes the starting locale
+  when the game ships it (or a parent locale); precedence is explicit `set_locale` >
+  detected locale > manifest `default_locale`.
+- **CLDR plurals** (feature `plurals`, default on): `I18nText::with_count(n)` /
+  `I18nText2d::with_count(n)` resolve the key to a plural sub-key (exact integer
+  `key.0` > CLDR category `key.one`/`key.few`/… via `icu_plurals` > `key.other` >
+  bare key) and inject a localized `%{count}` argument. Plural forms are ordinary
+  nested keys — no locale-file syntax change.
+
+### Breaking changes
+
+- A locale manifest is now required (default path `assets/locales/i18n.ron`):
+
+  ```ron
+  (
+      default_locale: "en",
+      files: ["en.json", "ja.json"], // order = merge order, later files win
+      fonts: [(family: "NotoSans", dir: "fonts/NotoSans", files: ["fallback.ttf", "ja.ttf"])],
+  )
+  ```
+
+- `I18nPlugin` is no longer a unit struct: use `I18nPlugin::default()` or
+  `I18nPlugin::with_manifest("path/to/manifest.ron")`.
+- `I18nComponent::locale` and `I18nComponent::translate` now take `&I18n` (locale state
+  lives in ECS, not in a global).
+- The `BEVY_ASSET_PATH` build-time environment variable is gone — obsolete now that
+  assets resolve at runtime like every other Bevy asset (this also removes the special
+  setup for workspace projects and docs.rs).
+- Translation parse errors are logged at runtime (the asset fails to load) instead of
+  failing the build.
+- Removed dependencies: `rust-i18n`, `cargo-emit`. Removed: `build.rs`.
+
+## [0.3.0] - 2026-06-19
 
 ### Changed
 

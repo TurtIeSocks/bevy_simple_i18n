@@ -1,6 +1,6 @@
 [package]
 name = "bevy_simple_i18n"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
 authors = ["TurtIeSocks"]
 license = "MIT OR Apache-2.0"
@@ -16,8 +16,14 @@ exclude = ["assets/"]
 members = ["web"]
 
 [features]
-default = ["numbers"]
+default = ["numbers", "yaml", "toml", "detect", "plurals"]
 numbers = ["fixed_decimal", "icu_decimal", "fixed_decimal/ryu"]
+yaml = ["dep:serde_yaml"]
+toml = ["dep:serde_toml"]
+# Detect the system/device locale at startup (iOS/Android/wasm/desktop)
+detect = ["dep:bevy_device_lang"]
+# CLDR plural categories for .with_count() (needs numbers for %{count} formatting)
+plurals = ["numbers", "dep:icu_plurals"]
 
 [dependencies]
 bevy = { version = "0.19", default-features = false, features = [
@@ -27,22 +33,33 @@ bevy = { version = "0.19", default-features = false, features = [
   "bevy_sprite", # provides Text2d (moved out of bevy_text in 0.17)
   "bevy_log",
 ] }
-icu_locid = "1.5.0"
-rust-i18n = "3"
+# icu_locale_core replaces the formally deprecated icu_locid (ICU4X 2.x)
+icu_locale_core = "2"
 
-fixed_decimal = { version = "0.5.6", optional = true }
-icu_decimal = { version = "1.5.0", optional = true }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# 0.12 matches the ron version bevy_asset 0.19 itself uses (no duplicate ron in trees)
+ron = "0.12"
+# serde_yaml 0.9 is what rust-i18n parses with today -> identical YAML behavior
+serde_yaml = { version = "0.9", optional = true }
+serde_toml = { version = "1", package = "toml", optional = true }
+thiserror = "2"
+
+# bevy-independent (jni/objc2/web-sys per platform), so it can't lag bevy releases
+bevy_device_lang = { version = "0.6", optional = true }
+
+fixed_decimal = { version = "0.7", optional = true }
+# `alloc` gates DecimalFormatter::format_to_string in icu_decimal 2.x
+icu_decimal = { version = "2", optional = true, features = ["alloc"] }
+icu_plurals = { version = "2", optional = true }
 
 [dev-dependencies]
 bevy = { version = "0.19" }
-rust-i18n = "3"
-
-[build-dependencies]
-cargo-emit = "0.2.1"
 
 [[example]]
 name = "basic"
 path = "examples/basic.rs"
+required-features = ["numbers"]
 
 [[example]]
 name = "changing_locale"

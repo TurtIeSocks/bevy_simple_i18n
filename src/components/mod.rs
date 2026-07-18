@@ -8,7 +8,7 @@ mod i18n_font;
 mod i18n_number;
 mod i18n_text;
 mod i18n_text_2d;
-mod utils;
+pub(crate) mod utils;
 
 pub use i18n_font::*;
 #[cfg(feature = "numbers")]
@@ -22,6 +22,9 @@ pub use i18n_text_2d::*;
 /// [`register_i18n_component`](crate::prelude::I18nComponentRegistration::register_i18n_component)
 /// lets you drive any custom text component from a translation key. The built-in
 /// [`I18nText`], [`I18nText2d`] and [`I18nNumber`] components all implement it.
+///
+/// Both methods receive the [`I18n`](crate::prelude::I18n) resource — all locale
+/// state lives in ECS, there are no global statics.
 pub trait I18nComponent: Component {
     /// The Bevy text component this writes its translated value into.
     ///
@@ -30,10 +33,10 @@ pub trait I18nComponent: Component {
     /// `#[require(..)]` attribute on the implementing component.
     type Target: Component<Mutability = Mutable> + DerefMut<Target = String>;
 
-    /// Returns this component's locale: its per-entity override if one was set, otherwise the
-    /// global locale managed by the [`I18n`](crate::prelude::I18n) resource.
-    fn locale(&self) -> String;
+    /// Returns this component's locale: its per-entity override if one was set,
+    /// otherwise the current locale of the [`I18n`](crate::prelude::I18n) resource.
+    fn locale<'a>(&'a self, i18n: &'a crate::prelude::I18n) -> &'a str;
 
     /// Produces the translated / localized string for the resolved [`locale`](Self::locale).
-    fn translate(&self) -> String;
+    fn translate(&self, i18n: &crate::prelude::I18n) -> String;
 }

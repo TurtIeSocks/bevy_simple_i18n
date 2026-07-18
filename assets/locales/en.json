@@ -2,5 +2,8 @@
   "_version": 1,
   "hello": "Hello World",
   "text2d": "Hello World (Text2d)",
-  "messages.hello": "Hello %{name}"
+  "messages.hello": "Hello %{name}",
+  "cats.0": "You have no cats",
+  "cats.one": "You have %{count} cat",
+  "cats.other": "You have %{count} cats"
 }
