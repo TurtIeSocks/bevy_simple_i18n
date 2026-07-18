@@ -234,6 +234,35 @@ fn modified_translation_assets_retranslate_live_text() {
     assert_eq!(text(&app, id), "アップデート済み");
 }
 
+#[cfg(feature = "plurals")]
+#[test]
+fn plural_categories_select_the_right_form() {
+    let mut app = ready_app();
+    let one = spawn_text(
+        &mut app,
+        I18nText::new("cats").with_count(1).with_locale("en"),
+    );
+    let many = spawn_text(
+        &mut app,
+        I18nText::new("cats").with_count(3).with_locale("en"),
+    );
+
+    assert_eq!(text(&app, one), "You have 1 cat");
+    assert_eq!(text(&app, many), "You have 3 cats");
+}
+
+#[cfg(feature = "plurals")]
+#[test]
+fn exact_count_key_overrides_the_cldr_category() {
+    let mut app = ready_app();
+    let id = spawn_text(
+        &mut app,
+        I18nText::new("cats").with_count(0).with_locale("en"),
+    );
+
+    assert_eq!(text(&app, id), "You have no cats");
+}
+
 #[cfg(feature = "numbers")]
 #[test]
 fn numbers_localize_per_locale() {

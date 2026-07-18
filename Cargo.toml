@@ -16,12 +16,14 @@ exclude = ["assets/"]
 members = ["web"]
 
 [features]
-default = ["numbers", "yaml", "toml", "detect"]
+default = ["numbers", "yaml", "toml", "detect", "plurals"]
 numbers = ["fixed_decimal", "icu_decimal", "fixed_decimal/ryu"]
 yaml = ["dep:serde_yaml"]
 toml = ["dep:serde_toml"]
 # Detect the system/device locale at startup (iOS/Android/wasm/desktop)
 detect = ["dep:bevy_device_lang"]
+# CLDR plural categories for .with_count() (needs numbers for %{count} formatting)
+plurals = ["numbers", "dep:icu_plurals"]
 
 [dependencies]
 bevy = { version = "0.19", default-features = false, features = [
@@ -49,6 +51,7 @@ bevy_device_lang = { version = "0.6", optional = true }
 fixed_decimal = { version = "0.7", optional = true }
 # `alloc` gates DecimalFormatter::format_to_string in icu_decimal 2.x
 icu_decimal = { version = "2", optional = true, features = ["alloc"] }
+icu_plurals = { version = "2", optional = true }
 
 [dev-dependencies]
 bevy = { version = "0.19" }

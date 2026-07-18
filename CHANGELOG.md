@@ -39,6 +39,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (desktop, iOS, Android, wasm via `bevy_device_lang`) becomes the starting locale
   when the game ships it (or a parent locale); precedence is explicit `set_locale` >
   detected locale > manifest `default_locale`.
+- **CLDR plurals** (feature `plurals`, default on): `I18nText::with_count(n)` /
+  `I18nText2d::with_count(n)` resolve the key to a plural sub-key (exact integer
+  `key.0` > CLDR category `key.one`/`key.few`/… via `icu_plurals` > `key.other` >
+  bare key) and inject a localized `%{count}` argument. Plural forms are ordinary
+  nested keys — no locale-file syntax change.
 
 ### Breaking changes
 

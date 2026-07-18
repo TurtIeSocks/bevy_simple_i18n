@@ -45,6 +45,10 @@ pub struct I18nText2d {
     args: Vec<(String, InterpolationType)>,
     /// Locale for this specific translation, `None` to use the global locale
     pub(crate) locale: Option<String>,
+    /// Plural count: resolves the key to its CLDR plural form and injects `%{count}`
+    #[cfg(feature = "plurals")]
+    #[reflect(ignore)]
+    count: Option<fixed_decimal::Decimal>,
 }
 
 impl I18nComponent for I18nText2d {
@@ -55,6 +59,16 @@ impl I18nComponent for I18nText2d {
     }
 
     fn translate(&self, i18n: &crate::prelude::I18n) -> String {
+        #[cfg(feature = "plurals")]
+        if let Some(count) = &self.count {
+            return super::utils::translate_plural(
+                i18n,
+                self.locale(i18n),
+                &self.key,
+                &self.args,
+                count,
+            );
+        }
         translate_by_key(i18n, self.locale(i18n), &self.key, &self.args)
     }
 }
@@ -66,7 +80,16 @@ impl I18nText2d {
             key: str.into(),
             args: vec![],
             locale: None,
+            #[cfg(feature = "plurals")]
+            count: None,
         }
+    }
+
+    /// Sets the plural count — see [`I18nText::with_count`](super::I18nText::with_count).
+    #[cfg(feature = "plurals")]
+    pub fn with_count(mut self, count: impl Into<f64>) -> Self {
+        self.count = Some(super::utils::f64_to_fd(count.into()));
+        self
     }
 
     /// Set the locale for this specific translation

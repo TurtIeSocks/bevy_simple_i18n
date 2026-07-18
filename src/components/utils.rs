@@ -2,13 +2,13 @@ use super::InterpolationType;
 use crate::prelude::I18n;
 
 #[cfg(feature = "numbers")]
-pub(super) fn f64_to_fd(value: f64) -> fixed_decimal::Decimal {
+pub(crate) fn f64_to_fd(value: f64) -> fixed_decimal::Decimal {
     fixed_decimal::Decimal::try_from_f64(value, fixed_decimal::FloatPrecision::RoundTrip)
         .unwrap_or_else(|err| panic!("Failed to parse Decimal from f64 {value}: {err}"))
 }
 
 #[cfg(feature = "numbers")]
-pub(super) fn resolve_locale(
+pub(crate) fn resolve_locale(
     locale: &str,
     label: impl std::fmt::Display,
 ) -> icu_locale_core::Locale {
@@ -34,11 +34,39 @@ pub(super) fn translate_by_key(
     key: &str,
     args: &[(String, InterpolationType)],
 ) -> String {
+    let (patterns, values) = build_args(locale, key, args);
+    translate_resolved(i18n, locale, key, patterns, values)
+}
+
+/// Like [`translate_by_key`], but first resolves `key` to its plural form for
+/// `count`, and injects `%{count}` (localized) unless the caller supplied one —
+/// user-provided args come first, and interpolation is first-match-wins.
+#[cfg(feature = "plurals")]
+pub(super) fn translate_plural(
+    i18n: &I18n,
+    locale: &str,
+    key: &str,
+    args: &[(String, InterpolationType)],
+    count: &fixed_decimal::Decimal,
+) -> String {
+    let resolved = crate::plural::resolve_plural_key(i18n, locale, key, count);
+    let (mut patterns, mut values) = build_args(locale, key, args);
+    patterns.push("count");
+    values.push(get_formatter(locale, key).format_to_string(count));
+    translate_resolved(i18n, locale, &resolved, patterns, values)
+}
+
+fn build_args<'a>(
+    locale: &str,
+    key: &str,
+    args: &'a [(String, InterpolationType)],
+) -> (Vec<&'a str>, Vec<String>) {
+    #[cfg(not(feature = "numbers"))]
+    let _ = (locale, key);
     #[cfg(feature = "numbers")]
     let fdf = get_formatter(locale, key);
 
-    let (patterns, values): (Vec<&str>, Vec<String>) = args
-        .iter()
+    args.iter()
         .map(|(k, interpolation_type)| {
             let value = match interpolation_type {
                 InterpolationType::String(v) => v.clone(),
@@ -47,8 +75,16 @@ pub(super) fn translate_by_key(
             };
             (k.as_str(), value)
         })
-        .unzip();
+        .unzip()
+}
 
+fn translate_resolved(
+    i18n: &I18n,
+    locale: &str,
+    key: &str,
+    patterns: Vec<&str>,
+    values: Vec<String>,
+) -> String {
     // rust-i18n parity: a complete miss renders the key verbatim, and interpolation
     // still applies to it.
     let translated = match i18n.translate(locale, key) {

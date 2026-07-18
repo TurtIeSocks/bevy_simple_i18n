@@ -147,6 +147,29 @@ commands.spawn(I18nText::new("messages.hello").with_arg("name", "world"));
 commands.spawn(I18nText::new("messages.cats").with_num_arg("count", 20));
 ```
 
+### Plurals
+
+With the `plurals` feature (default on), plural forms are plain sub-keys — no new file
+syntax. `with_count` picks the right form via CLDR plural rules for the locale
+(English has `one`/`other`; Polish adds `few`/`many`; Arabic has six forms) and makes
+`%{count}` available as a localized argument:
+
+```json
+{
+  "cats.0": "You have no cats",
+  "cats.one": "You have %{count} cat",
+  "cats.other": "You have %{count} cats"
+}
+```
+
+```rust
+commands.spawn(I18nText::new("cats").with_count(3)); // "You have 3 cats"
+commands.spawn(I18nText::new("cats").with_count(0)); // "You have no cats"
+```
+
+Resolution order: exact integer sub-key (`cats.0`) → CLDR category (`cats.one`) →
+`cats.other` → the bare key.
+
 ### Dynamic Fonts
 
 Declare a font family in the manifest (see above), then:
@@ -262,6 +285,7 @@ app.register_i18n_component::<MyLabel>();
 | `yaml`    | yes     | `.yml` / `.yaml` locale files                 |
 | `toml`    | yes     | `.toml` locale files                          |
 | `detect`  | yes     | system-locale auto-detect (`bevy_device_lang`) |
+| `plurals` | yes     | CLDR plural forms via `with_count` (icu4x)     |
 
 ## Bevy support table
 
