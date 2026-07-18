@@ -7,6 +7,15 @@ pub(crate) fn f64_to_fd(value: f64) -> fixed_decimal::Decimal {
         .unwrap_or_else(|err| panic!("Failed to parse Decimal from f64 {value}: {err}"))
 }
 
+/// Non-panicking variant for `with_count`: a NaN/infinite count is a data bug worth
+/// an error log, not a crash.
+#[cfg(feature = "plurals")]
+pub(crate) fn try_f64_to_fd(value: f64) -> Option<fixed_decimal::Decimal> {
+    fixed_decimal::Decimal::try_from_f64(value, fixed_decimal::FloatPrecision::RoundTrip)
+        .map_err(|err| bevy::log::error!("Ignoring invalid plural count {value}: {err}"))
+        .ok()
+}
+
 #[cfg(feature = "numbers")]
 pub(crate) fn resolve_locale(
     locale: &str,

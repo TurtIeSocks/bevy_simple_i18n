@@ -88,7 +88,7 @@ impl I18nText2d {
     /// Sets the plural count — see [`I18nText::with_count`](super::I18nText::with_count).
     #[cfg(feature = "plurals")]
     pub fn with_count(mut self, count: impl Into<f64>) -> Self {
-        self.count = Some(super::utils::f64_to_fd(count.into()));
+        self.count = super::utils::try_f64_to_fd(count.into());
         self
     }
 

@@ -101,23 +101,26 @@ impl I18n {
     /// private-use tails), then the explicit fallback locales. `None` on a
     /// complete miss — callers render the key verbatim.
     pub fn translate(&self, locale: &str, key: &str) -> Option<&str> {
-        if let Some(text) = self.lookup(locale, key) {
-            return Some(text);
-        }
-        let mut chain = locale;
-        while let Some(index) = chain.rfind('-') {
-            chain = chain[..index].trim_end_matches("-x");
-            if let Some(text) = self.lookup(chain, key) {
-                return Some(text);
-            }
-        }
-        self.fallback
-            .iter()
-            .find_map(|fallback| self.lookup(fallback, key))
+        self.candidate_locales(locale)
+            .into_iter()
+            .find_map(|candidate| self.lookup_exact(candidate, key))
     }
 
-    fn lookup(&self, locale: &str, key: &str) -> Option<&str> {
+    pub(crate) fn lookup_exact(&self, locale: &str, key: &str) -> Option<&str> {
         self.translations.get(locale)?.get(key).map(String::as_str)
+    }
+
+    /// The full lookup chain for `locale`: itself, its truncation parents, then the
+    /// explicit fallback locales — the same order [`translate`](Self::translate) uses.
+    pub(crate) fn candidate_locales<'a>(&'a self, locale: &'a str) -> Vec<&'a str> {
+        let mut chain = vec![locale];
+        let mut current = locale;
+        while let Some(index) = current.rfind('-') {
+            current = current[..index].trim_end_matches("-x");
+            chain.push(current);
+        }
+        chain.extend(self.fallback.iter().map(String::as_str));
+        chain
     }
 
     /// Replaces the translation table (called by the asset sync system).

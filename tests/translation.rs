@@ -253,6 +253,21 @@ fn plural_categories_select_the_right_form() {
 
 #[cfg(feature = "plurals")]
 #[test]
+fn non_finite_counts_do_not_panic() {
+    // A NaN/infinite count is a data bug, not a reason to crash the game: it logs an
+    // error and behaves as if no count was set (bare key -> the usual miss echo,
+    // since en.json ships no bare "cats" key).
+    let mut app = ready_app();
+    let id = spawn_text(
+        &mut app,
+        I18nText::new("cats").with_count(f64::NAN).with_locale("en"),
+    );
+
+    assert_eq!(text(&app, id), "cats");
+}
+
+#[cfg(feature = "plurals")]
+#[test]
 fn exact_count_key_overrides_the_cldr_category() {
     let mut app = ready_app();
     let id = spawn_text(
