@@ -134,6 +134,19 @@ the same key for the same locale, the file listed **later in the manifest wins**
 commands.spawn(I18nText::new("hello"));
 ```
 
+### Rich Text Spans
+
+`I18nTextSpan` translates a `TextSpan` child, so a paragraph can mix
+independently translated, independently styled pieces. Spawn it as a child of
+an entity with `Text` (or `Text2d`):
+
+```rust
+commands.spawn(I18nText::new("greeting")).with_child((
+    I18nTextSpan::new("player_name_label").with_arg("name", "Alex"),
+    TextColor(Color::srgb(1.0, 0.8, 0.2)),
+));
+```
+
 ### Number Localization
 
 ```rust

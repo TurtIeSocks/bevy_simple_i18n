@@ -101,6 +101,27 @@ fn text2d_updates_when_the_global_locale_changes() {
 
 #[cfg(feature = "yaml")]
 #[test]
+fn text_span_translates_and_updates_on_locale_change() {
+    let mut app = ready_app();
+    let root = app.world_mut().spawn(Text::default()).id();
+    let span = app.world_mut().spawn(I18nTextSpan::new("hello")).id();
+    app.world_mut().entity_mut(root).add_child(span);
+    app.update();
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(app.world().get::<TextSpan>(span).unwrap().0, "Hello world");
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<TextSpan>(span).unwrap().0,
+        "こんにちは世界"
+    );
+}
+
+#[cfg(feature = "yaml")]
+#[test]
 fn interpolates_arguments() {
     let mut app = ready_app();
     let id = spawn_text(

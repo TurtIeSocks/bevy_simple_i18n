@@ -8,6 +8,7 @@ mod i18n_font;
 mod i18n_number;
 mod i18n_text;
 mod i18n_text_2d;
+mod i18n_text_span;
 pub(crate) mod utils;
 
 pub use i18n_font::*;
@@ -15,6 +16,7 @@ pub use i18n_font::*;
 pub use i18n_number::*;
 pub use i18n_text::*;
 pub use i18n_text_2d::*;
+pub use i18n_text_span::*;
 
 /// Trait implemented by every component that `bevy_simple_i18n` keeps translated.
 ///

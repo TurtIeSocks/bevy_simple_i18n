@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 use crate::{
     assets::{I18nManifest, I18nManifestLoader, TranslationFile, TranslationFileLoader},
-    components::{I18nFont, I18nText, I18nText2d},
+    components::{I18nFont, I18nText, I18nText2d, I18nTextSpan},
     parse,
     prelude::I18nComponent,
     resources::{FontFolder, FontManager, I18n},
@@ -63,6 +63,7 @@ impl Plugin for I18nPlugin {
             .register_type::<I18n>()
             .register_type::<I18nText>()
             .register_type::<I18nText2d>()
+            .register_type::<I18nTextSpan>()
             .register_type::<I18nFont>()
             .init_asset::<TranslationFile>()
             .init_asset::<I18nManifest>()
@@ -81,7 +82,8 @@ impl Plugin for I18nPlugin {
             // the same frame (`update_translations` runs in Update).
             .add_systems(PreUpdate, sync_translations)
             .register_i18n_component::<I18nText>()
-            .register_i18n_component::<I18nText2d>();
+            .register_i18n_component::<I18nText2d>()
+            .register_i18n_component::<I18nTextSpan>();
 
         #[cfg(feature = "detect")]
         app.add_systems(PreStartup, detect_system_locale);
