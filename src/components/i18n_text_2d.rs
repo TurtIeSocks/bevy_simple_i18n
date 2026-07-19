@@ -92,9 +92,18 @@ impl I18nText2d {
         self
     }
 
-    /// Set the locale for this specific translation
+    /// Set the locale for this specific translation.
+    ///
+    /// Underscore-separated tags (`en_US`) are normalized to hyphens before
+    /// validation. An invalid locale is ignored (logged as an error) and the
+    /// global locale is used instead.
     pub fn with_locale(mut self, locale: impl Into<String>) -> Self {
-        self.locale = Some(locale.into());
+        let raw: String = locale.into();
+        let normalized = raw.replace('_', "-");
+        match normalized.parse::<icu_locale_core::Locale>() {
+            Ok(_) => self.locale = Some(normalized),
+            Err(err) => bevy::log::error!("Ignoring invalid locale {raw:?}: {err}"),
+        }
         self
     }
 
@@ -108,14 +117,15 @@ impl I18nText2d {
     }
 
     #[cfg(feature = "numbers")]
-    /// Add a number interpolation argument to the translation key
+    /// Add a number interpolation argument to the translation key.
     ///
-    /// This method can be called as many times as needed
+    /// This method can be called as many times as needed. A NaN/infinite value is a
+    /// data bug worth an error log, not a crash: the argument is skipped and the
+    /// `%{name}` pattern stays verbatim in the rendered text.
     pub fn with_num_arg(mut self, key: impl Into<String>, value: impl Into<f64>) -> Self {
-        self.args.push((
-            key.into(),
-            InterpolationType::Number(super::utils::f64_to_fd(value.into())),
-        ));
+        if let Some(fd) = super::utils::try_f64_to_fd(value.into()) {
+            self.args.push((key.into(), InterpolationType::Number(fd)));
+        }
         self
     }
 }
