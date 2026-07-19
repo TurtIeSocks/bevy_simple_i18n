@@ -103,6 +103,29 @@ fn third_party_target_without_derefmut_translates() {
     );
 }
 
+#[cfg(all(feature = "rich_text3d", feature = "yaml"))]
+#[test]
+fn rich_text3d_segment_translates_on_locale_change() {
+    use bevy_rich_text3d::FetchedTextSegment;
+
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nText3dSegment::new("hello"));
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(
+        app.world().get::<FetchedTextSegment>(id).unwrap().as_str(),
+        "Hello world"
+    );
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<FetchedTextSegment>(id).unwrap().as_str(),
+        "こんにちは世界"
+    );
+}
+
 // Several vectors assert values that v2_example.yml (later in the manifest) overrides;
 // they only hold when the YAML file actually loads, hence the `yaml` feature gates.
 
