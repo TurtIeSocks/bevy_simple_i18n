@@ -297,30 +297,44 @@ app.register_i18n_component::<MyLabel>();
 
 ### Third-party text components (bevy_rich_text3d)
 
-Any component that carries a `String` — even without `DerefMut<Target = String>` —
-can join the full i18n pipeline (interpolation, plurals, per-entity locales) by
-implementing [`I18nTarget`]. This is how you'd wire up
-[`bevy_rich_text3d`](https://docs.rs/bevy_rich_text3d)'s `FetchedTextSegment`,
-which exposes `as_str`/`set_if_changed` but no `DerefMut`:
+Enable the `rich_text3d` feature and this crate provides `I18nText3dSegment` —
+a ready-made component that drives
+[`bevy_rich_text3d`](https://docs.rs/bevy_rich_text3d)'s `FetchedTextSegment`
+through the full i18n pipeline (interpolation, plurals, per-entity locales),
+same as `I18nText`/`I18nText2d`/`I18nTextSpan`:
+
+```toml
+bevy_simple_i18n = { version = "...", features = ["rich_text3d"] }
+```
 
 ```rust,ignore
-impl I18nTarget for FetchedTextSegment {
-    fn set_text(&mut self, text: String) {
-        self.0 = text;
-    }
-}
+// The translated segment: bevy_simple_i18n keeps this entity's
+// FetchedTextSegment in sync with the "hello" key.
+let segment = commands.spawn(I18nText3dSegment::new("hello")).id();
 
-#[derive(Component)]
-#[require(FetchedTextSegment)]
-struct I18nText3dSegment {
-    key: String,
-}
-
-impl I18nComponent for I18nText3dSegment {
-    type Target = FetchedTextSegment;
-    // ...locale() / translate() as above
-}
+commands.spawn((
+    Text3d::from_extract(segment),
+    Text3dStyling { size: 64.0, ..Default::default() },
+    Mesh3d::default(),
+    MeshMaterial3d(materials.add(StandardMaterial {
+        base_color_texture: Some(TextAtlas::DEFAULT_IMAGE.clone()),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        ..Default::default()
+    })),
+));
 ```
+
+See [`examples/rich_text_3d.rs`](examples/rich_text_3d.rs) for the full
+runnable example.
+
+Why a feature instead of a doc recipe: [`I18nTarget`] is *our* trait, and
+`FetchedTextSegment` is bevy_rich_text3d's foreign type — a downstream crate
+implementing our trait for a type neither crate owns hits the orphan rule
+(E0117) and cannot compile anywhere. Only the crate that owns the trait can
+provide that impl. For a *different* third-party text component, implement
+[`I18nTarget`] for **your own** component types, or ask that crate (or this
+one) to add the impl.
 
 Note that [`I18nFont`] does not apply to `Text3d` — it styles fonts through
 `Text3dStyling`, not Bevy's `TextFont`.
@@ -348,6 +362,7 @@ Note that [`I18nFont`] does not apply to `Text3d` — it styles fonts through
 | `toml`    | yes     | `.toml` locale files                          |
 | `detect`  | yes     | system-locale auto-detect (`bevy_device_lang`) |
 | `plurals` | yes     | CLDR plural forms via `with_count` (icu4x)     |
+| `rich_text3d` | no  | `I18nText3dSegment` for `bevy_rich_text3d`     |
 
 ## Bevy support table
 
