@@ -72,12 +72,29 @@ impl I18nNumber {
     /// validation. An invalid locale is ignored (logged as an error) and the
     /// global locale is used instead.
     pub fn with_locale(mut self, locale: impl Into<String>) -> Self {
+        self.set_locale(locale);
+        self
+    }
+
+    /// Replaces the number value in place. A NaN/infinite value is a data bug
+    /// worth an error log, not a crash: the previous value is left unchanged.
+    pub fn set_number(&mut self, number: impl Into<f64>) {
+        if let Some(fd) = utils::try_f64_to_fd(number.into()) {
+            self.fixed_decimal = Some(fd);
+        }
+    }
+
+    /// Set the locale for this specific translation, in place.
+    ///
+    /// Underscore-separated tags (`en_US`) are normalized to hyphens before
+    /// validation. An invalid locale is ignored (logged as an error) and the
+    /// previous locale is left unchanged.
+    pub fn set_locale(&mut self, locale: impl Into<String>) {
         let raw: String = locale.into();
         let normalized = raw.replace('_', "-");
         match normalized.parse::<icu_locale_core::Locale>() {
             Ok(_) => self.locale = Some(normalized),
             Err(err) => bevy::log::error!("Ignoring invalid locale {raw:?}: {err}"),
         }
-        self
     }
 }

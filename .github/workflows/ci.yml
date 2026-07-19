@@ -6,6 +6,16 @@ on:
 
 name: Continuous Integration
 
+env:
+  # Incremental compilation only helps local rebuilds; on fresh CI runners it
+  # just bloats target/ and the rust-cache save (which alone took 4 minutes on
+  # windows-latest).
+  CARGO_INCREMENTAL: 0
+  # Full debuginfo made the windows-latest test job take ~22 minutes to compile
+  # and produced a multi-GB cache. line-tables-only keeps file:line backtraces
+  # for CI-only test failures at a fraction of the compile/link/cache cost.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
+
 jobs:
   check:
     name: Run cargo check

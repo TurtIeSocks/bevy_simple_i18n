@@ -1,4 +1,9 @@
-use bevy::{ecs::reflect::ReflectResource, platform::collections::HashMap, prelude::*, text::Font};
+use bevy::{
+    ecs::reflect::ReflectResource,
+    platform::collections::{HashMap, HashSet},
+    prelude::*,
+    text::Font,
+};
 use icu_locale_core::Locale;
 
 use crate::parse::Table;
@@ -46,6 +51,13 @@ pub struct I18n {
     /// translation table loads, but only if the game actually ships that locale.
     #[reflect(ignore)]
     detected: Option<String>,
+    /// (locale, key) pairs already warned about as missing — so a missing key
+    /// warns once, not once per entity per retranslate. Interior mutability
+    /// because lookups take `&self`; reset on every table rebuild so hot
+    /// reloads re-report. Lives here (not a static) per the crate's
+    /// no-global-state charter.
+    #[reflect(ignore)]
+    missed: std::sync::Mutex<HashSet<(String, String)>>,
 }
 
 impl Default for I18n {
@@ -58,6 +70,7 @@ impl Default for I18n {
             ready: false,
             explicit: false,
             detected: None,
+            missed: std::sync::Mutex::new(HashSet::default()),
         }
     }
 }
@@ -137,6 +150,10 @@ impl I18n {
         self.locales = locales;
         self.fallback = fallback;
         self.ready = ready;
+        self.missed
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
         if self.explicit {
             return;
         }
@@ -193,6 +210,16 @@ impl I18n {
     /// The system/device locale detected at startup, if any (feature `detect`).
     pub fn detected(&self) -> Option<&str> {
         self.detected.as_deref()
+    }
+
+    /// Records a missing (locale, key) lookup. Returns `true` the FIRST time this
+    /// pair is seen since the last table rebuild — the caller warns on `true`,
+    /// logs at debug on `false`.
+    pub(crate) fn note_miss(&self, locale: &str, key: &str) -> bool {
+        self.missed
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .insert((locale.to_string(), key.to_string()))
     }
 }
 
@@ -253,6 +280,19 @@ mod tests {
         let mut i18n = I18n::default();
         i18n.apply_table(table(&["en"]), "not a locale!", Vec::new(), true);
         assert_eq!(i18n.current(), "en");
+    }
+
+    #[test]
+    fn note_miss_dedupes_until_table_rebuild() {
+        let mut i18n = I18n::default();
+        assert!(i18n.note_miss("en", "gone"), "first miss reports");
+        assert!(!i18n.note_miss("en", "gone"), "repeat is deduped");
+        assert!(
+            i18n.note_miss("ja", "gone"),
+            "different locale is a new pair"
+        );
+        i18n.apply_table(Table::default(), "en", Vec::new(), true);
+        assert!(i18n.note_miss("en", "gone"), "table rebuild resets the set");
     }
 }
 

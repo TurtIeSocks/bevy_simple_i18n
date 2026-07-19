@@ -113,12 +113,14 @@ fn translate_resolved(
     let translated = match i18n.translate(locale, key) {
         Some(text) => text,
         None => {
-            if i18n.ready() {
-                bevy::log::warn!("Missing translation for key `{key}` (locale `{locale}`)");
-            } else {
+            if !i18n.ready() {
                 bevy::log::debug!(
                     "Translation for key `{key}` requested before locale assets loaded"
                 );
+            } else if i18n.note_miss(locale, key) {
+                bevy::log::warn!("Missing translation for key `{key}` (locale `{locale}`)");
+            } else {
+                bevy::log::debug!("Missing translation for key `{key}` (locale `{locale}`)");
             }
             key
         }

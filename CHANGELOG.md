@@ -5,6 +5,31 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`I18nTextSpan`** — translated rich-text spans. Spawn as a child of a
+  `Text`/`Text2d` entity to compose one paragraph out of independently styled,
+  independently translated pieces.
+- **In-place setters** on `I18nText`, `I18nText2d`, `I18nTextSpan`
+  (`set_key`, `set_locale`, `set_arg`, `set_num_arg`, `clear_args`,
+  `set_count`) and `I18nNumber` (`set_number`, `set_locale`) — update live
+  text through a normal `&mut` query (score counters!) instead of re-inserting
+  a new component; change detection re-renders automatically.
+  `set_arg`/`set_num_arg` upsert by name.
+- Missing-translation warnings are now deduplicated: the first miss of a
+  (locale, key) pair logs a warning, repeats log at debug level, and the
+  seen-set resets when the translation table is rebuilt (hot reload).
+
+### Changed
+
+- `I18nText` and `I18nText2d` are now generated from a single internal macro
+  (no public API change); `I18nTextSpan` is a third instantiation.
+- CI: disabled incremental compilation and switched to `line-tables-only`
+  debuginfo — the windows-latest test job dropped from ~27 minutes of
+  compile + cache churn.
+
 ## [0.4.0] - 2026-07-19
 
 ### Changed
