@@ -21,10 +21,10 @@ green in CI.
 | 001  | Locale buttons appear after translations load (example + web demo) | P1 | S | — | DONE (2026-07-19, merge `2d5a778`; executor + 2 verifiers + advisor all APPROVE) |
 | 002  | Panic-proof user-supplied locales & numbers; lazy formatter | P1 | M | — | DONE (2026-07-19, merge `f652a27`; 6 new regression tests; all APPROVE) |
 | 003  | CI modernization: clippy/fmt/wasm gates, caching, publish toolchain | P2 | S | — | DONE (2026-07-19, merge `6707cc5`; note: `cargo publish --dry-run` skipped for transient host disk-full, `cargo package --list` fallback passed per plan contingency) |
-| 004  | Dedupe `I18nText`/`I18nText2d` behind one macro (behavior-preserving) | P2 | M | — | TODO |
-| 005  | `I18nTextSpan` — translated rich-text spans | P2 | S | 004 | TODO |
-| 006  | Runtime mutators (`set_key`/`set_arg`/`set_count`/`set_number`) | P2 | M | 004 | TODO |
-| 007  | Warn once per missing (locale, key) | P3 | S | — | TODO |
+| 004  | Dedupe `I18nText`/`I18nText2d` behind one macro (behavior-preserving) | P2 | M | — | DONE (2026-07-19, merge `d2f7a9e`; first dispatch STOPPED on wrong-base drift check — re-run with pinned base; advisor re-ran all criteria green, quality APPROVE) |
+| 005  | `I18nTextSpan` — translated rich-text spans | P2 | S | 004 | DONE (2026-07-19, commit `a6c8498`, merge `3fea867`; criteria + quality + advisor APPROVE) |
+| 006  | Runtime mutators (`set_key`/`set_arg`/`set_count`/`set_number`) | P2 | M | 004 | DONE (2026-07-19, commit `4303228`, merge `3fea867`; 5 new integration tests; all APPROVE) |
+| 007  | Warn once per missing (locale, key) | P3 | S | — | DONE (2026-07-19, cherry-picked as `a054ede`; executor worktree had forked from stale main — commit re-parented onto the branch, full gates green: 39+23+6 / 27+4+5, clippy, fmt) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
