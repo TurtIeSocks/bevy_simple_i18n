@@ -1,5 +1,3 @@
-use std::ops::DerefMut;
-
 use bevy::ecs::component::Mutable;
 use bevy::prelude::Component;
 
@@ -18,6 +16,49 @@ pub use i18n_text::*;
 pub use i18n_text_2d::*;
 pub use i18n_text_span::*;
 
+/// A text component `bevy_simple_i18n` can write translated strings into.
+///
+/// Implemented for Bevy's [`Text`](bevy::prelude::Text),
+/// [`Text2d`](bevy::prelude::Text2d) and [`TextSpan`](bevy::prelude::TextSpan).
+/// Implement it for any third-party component that carries a `String` (e.g.
+/// `bevy_rich_text3d`'s `FetchedTextSegment`) to drive it from a translation
+/// key with the full pipeline — interpolation, plurals, per-entity locales:
+///
+/// ```rust,ignore
+/// impl I18nTarget for FetchedTextSegment {
+///     fn set_text(&mut self, text: String) {
+///         self.0 = text;
+///     }
+/// }
+/// ```
+///
+/// Deliberately NOT blanket-implemented over `DerefMut<Target = String>`:
+/// a blanket impl would make downstream `impl I18nTarget for TheirType`
+/// a coherence error (E0119) the moment `TheirType` could ever deref to
+/// `String`. Explicit impls keep the trait open for the ecosystem.
+pub trait I18nTarget: Component<Mutability = Mutable> {
+    /// Replaces the component's text with the translated value.
+    fn set_text(&mut self, text: String);
+}
+
+impl I18nTarget for bevy::prelude::Text {
+    fn set_text(&mut self, text: String) {
+        self.0 = text;
+    }
+}
+
+impl I18nTarget for bevy::prelude::Text2d {
+    fn set_text(&mut self, text: String) {
+        self.0 = text;
+    }
+}
+
+impl I18nTarget for bevy::prelude::TextSpan {
+    fn set_text(&mut self, text: String) {
+        self.0 = text;
+    }
+}
+
 /// Trait implemented by every component that `bevy_simple_i18n` keeps translated.
 ///
 /// Implementing this and registering it with
@@ -28,12 +69,10 @@ pub use i18n_text_span::*;
 /// Both methods receive the [`I18n`](crate::prelude::I18n) resource — all locale
 /// state lives in ECS, there are no global statics.
 pub trait I18nComponent: Component {
-    /// The Bevy text component this writes its translated value into.
-    ///
-    /// It must dereference to a [`String`] — as Bevy's [`Text`](bevy::prelude::Text) and
-    /// [`Text2d`](bevy::prelude::Text2d) both do — and is inserted automatically via the
+    /// The text component this writes its translated value into — anything
+    /// implementing [`I18nTarget`]. It is inserted automatically via the
     /// `#[require(..)]` attribute on the implementing component.
-    type Target: Component<Mutability = Mutable> + DerefMut<Target = String>;
+    type Target: I18nTarget;
 
     /// Returns this component's locale: its per-entity override if one was set,
     /// otherwise the current locale of the [`I18n`](crate::prelude::I18n) resource.

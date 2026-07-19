@@ -271,8 +271,9 @@ fn loading_screen_done(i18n: Res<I18n>) -> bool {
 
 ### `I18nComponent`
 
-Implement this for your own component to drive any `String`-carrying text component
-from a translation key. Both methods receive the [`I18n`] resource:
+Implement this for your own component to drive any text component implementing
+[`I18nTarget`] from a translation key (Bevy's `Text`, `Text2d` and `TextSpan` all
+implement it out of the box). Both methods receive the [`I18n`] resource:
 
 ```rust
 impl I18nComponent for MyLabel {
@@ -293,6 +294,36 @@ Registers your component for automatic re-translation (and dynamic font support)
 ```rust
 app.register_i18n_component::<MyLabel>();
 ```
+
+### Third-party text components (bevy_rich_text3d)
+
+Any component that carries a `String` — even without `DerefMut<Target = String>` —
+can join the full i18n pipeline (interpolation, plurals, per-entity locales) by
+implementing [`I18nTarget`]. This is how you'd wire up
+[`bevy_rich_text3d`](https://docs.rs/bevy_rich_text3d)'s `FetchedTextSegment`,
+which exposes `as_str`/`set_if_changed` but no `DerefMut`:
+
+```rust,ignore
+impl I18nTarget for FetchedTextSegment {
+    fn set_text(&mut self, text: String) {
+        self.0 = text;
+    }
+}
+
+#[derive(Component)]
+#[require(FetchedTextSegment)]
+struct I18nText3dSegment {
+    key: String,
+}
+
+impl I18nComponent for I18nText3dSegment {
+    type Target = FetchedTextSegment;
+    // ...locale() / translate() as above
+}
+```
+
+Note that [`I18nFont`] does not apply to `Text3d` — it styles fonts through
+`Text3dStyling`, not Bevy's `TextFont`.
 
 ## Migrating from 0.3
 

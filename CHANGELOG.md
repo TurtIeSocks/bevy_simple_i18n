@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Missing-translation warnings are now deduplicated: the first miss of a
   (locale, key) pair logs a warning, repeats log at debug level, and the
   seen-set resets when the translation table is rebuilt (hot reload).
+- **`I18nTarget` trait** — implement it to drive any third-party
+  `String`-carrying text component (e.g. `bevy_rich_text3d`'s
+  `FetchedTextSegment`) with the full i18n pipeline.
 
 ### Changed
 
@@ -29,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: disabled incremental compilation and switched to `line-tables-only`
   debuginfo — the windows-latest test job dropped from ~27 minutes of
   compile + cache churn.
+
+### Breaking changes
+
+- `I18nComponent::Target`'s bound changed from
+  `Component<Mutability = Mutable> + DerefMut<Target = String>` to
+  `I18nTarget`. Migration: implement `I18nTarget` for your target type
+  (3 lines: `fn set_text(&mut self, text: String) { *self = text; }` — or
+  `self.0 = text` for tuple structs); Bevy's `Text`/`Text2d`/`TextSpan` are
+  provided.
 
 ## [0.4.0] - 2026-07-19
 

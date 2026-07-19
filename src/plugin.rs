@@ -5,7 +5,7 @@ use bevy::prelude::*;
 
 use crate::{
     assets::{I18nManifest, I18nManifestLoader, TranslationFile, TranslationFileLoader},
-    components::{I18nFont, I18nText, I18nText2d, I18nTextSpan},
+    components::{I18nFont, I18nTarget, I18nText, I18nText2d, I18nTextSpan},
     parse,
     prelude::I18nComponent,
     resources::{FontFolder, FontManager, I18n},
@@ -131,7 +131,7 @@ fn update_translations<T: I18nComponent>(
             continue;
         }
         bevy::log::debug!("Updating translation for locale {}", key.locale(&i18n));
-        **target = key.translate(&i18n);
+        target.set_text(key.translate(&i18n));
         if let (Some(mut text_font), Some(dyn_font)) = (text_font, dyn_font) {
             // Bevy 0.19: TextFont::font is a `FontSource` enum; Handle<Font> converts via From.
             text_font.font = font_manager.get(&dyn_font.0, key.locale(&i18n)).into();

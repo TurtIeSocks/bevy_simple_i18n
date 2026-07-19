@@ -55,6 +55,54 @@ fn spawn_text(app: &mut App, bundle: impl Bundle) -> Entity {
     id
 }
 
+/// Mock of a third-party text component (e.g. bevy_rich_text3d's
+/// `FetchedTextSegment`): holds a String but does NOT deref to it.
+#[derive(Component, Default)]
+struct MockSegment(String);
+
+impl I18nTarget for MockSegment {
+    fn set_text(&mut self, text: String) {
+        self.0 = text;
+    }
+}
+
+#[derive(Component)]
+#[require(MockSegment)]
+struct MockLabel(String);
+
+impl I18nComponent for MockLabel {
+    type Target = MockSegment;
+    fn locale<'a>(&'a self, i18n: &'a I18n) -> &'a str {
+        i18n.current()
+    }
+    fn translate(&self, i18n: &I18n) -> String {
+        i18n.translate(self.locale(i18n), &self.0)
+            .unwrap_or(&self.0)
+            .to_string()
+    }
+}
+
+#[cfg(feature = "yaml")]
+#[test]
+fn third_party_target_without_derefmut_translates() {
+    let mut app = test_app();
+    app.register_i18n_component::<MockLabel>();
+    advance_until_ready(&mut app);
+    let id = app.world_mut().spawn(MockLabel("hello".into())).id();
+    app.update();
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(app.world().get::<MockSegment>(id).unwrap().0, "Hello world");
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<MockSegment>(id).unwrap().0,
+        "こんにちは世界"
+    );
+}
+
 // Several vectors assert values that v2_example.yml (later in the manifest) overrides;
 // they only hold when the YAML file actually loads, hence the `yaml` feature gates.
 
