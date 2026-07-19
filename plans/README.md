@@ -25,7 +25,8 @@ green in CI.
 | 005  | `I18nTextSpan` — translated rich-text spans | P2 | S | 004 | DONE (2026-07-19, commit `a6c8498`, merge `3fea867`; criteria + quality + advisor APPROVE) |
 | 006  | Runtime mutators (`set_key`/`set_arg`/`set_count`/`set_number`) | P2 | M | 004 | DONE (2026-07-19, commit `4303228`, merge `3fea867`; 5 new integration tests; all APPROVE) |
 | 007  | Warn once per missing (locale, key) | P3 | S | — | DONE (2026-07-19, cherry-picked as `a054ede`; executor worktree had forked from stale main — commit re-parented onto the branch, full gates green: 39+23+6 / 27+4+5, clippy, fmt) |
-| 008  | `I18nTarget` trait — unlock third-party text components (bevy_rich_text3d) | P2 | M | — | DONE (2026-07-19, merge `6227881` + fixup `1510cef`; quality REVISE on a non-compiling CHANGELOG example — originated in the plan text itself — fixed by builder agent; all gates green) |
+| 008  | `I18nTarget` trait — unlock third-party text components (bevy_rich_text3d) | P2 | M | — | DONE (2026-07-19, merge `6227881` + fixup `1510cef`; quality REVISE on a non-compiling CHANGELOG example — originated in the plan text itself — fixed by builder agent; all gates green). NOTE: its README recipe was later found orphan-rule-unimplementable — superseded by 009 |
+| 009  | Feature `rich_text3d`: in-crate `I18nTarget` impl + `I18nText3dSegment` + example (fixes 008's recipe) | P1 | M | 008 | DONE (2026-07-19, commits `01ec044`+`f34ca44`, merged; example compiled against real 0.7 API without adaptation; all APPROVE, gates green incl. feature-off build) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
