@@ -37,10 +37,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `I18nComponent::Target`'s bound changed from
   `Component<Mutability = Mutable> + DerefMut<Target = String>` to
-  `I18nTarget`. Migration: implement `I18nTarget` for your target type
-  (3 lines: `fn set_text(&mut self, text: String) { *self = text; }` — or
-  `self.0 = text` for tuple structs); Bevy's `Text`/`Text2d`/`TextSpan` are
-  provided.
+  `I18nTarget`. Migration: implement `I18nTarget` for your target type —
+  three lines, e.g. `fn set_text(&mut self, text: String) { self.0 = text; }`
+  for a tuple struct (write whichever field holds your text); Bevy's
+  `Text`/`Text2d`/`TextSpan` are provided out of the box.
 
 ## [0.4.0] - 2026-07-19
 
