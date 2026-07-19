@@ -101,6 +101,27 @@ fn text2d_updates_when_the_global_locale_changes() {
 
 #[cfg(feature = "yaml")]
 #[test]
+fn text_span_translates_and_updates_on_locale_change() {
+    let mut app = ready_app();
+    let root = app.world_mut().spawn(Text::default()).id();
+    let span = app.world_mut().spawn(I18nTextSpan::new("hello")).id();
+    app.world_mut().entity_mut(root).add_child(span);
+    app.update();
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(app.world().get::<TextSpan>(span).unwrap().0, "Hello world");
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<TextSpan>(span).unwrap().0,
+        "こんにちは世界"
+    );
+}
+
+#[cfg(feature = "yaml")]
+#[test]
 fn interpolates_arguments() {
     let mut app = ready_app();
     let id = spawn_text(
@@ -328,6 +349,89 @@ fn number_interpolation_arguments_are_localized() {
     );
 
     assert_eq!(text(&app, id), "You have 2,000.3 cats");
+}
+
+#[cfg(all(feature = "numbers", feature = "yaml"))]
+#[test]
+fn set_num_arg_retranslates_live_text() {
+    let mut app = ready_app();
+    let id = spawn_text(
+        &mut app,
+        I18nText::new("messages.cats")
+            .with_num_arg("count", 1)
+            .with_locale("en"),
+    );
+    assert_eq!(text(&app, id), "You have 1 cats");
+
+    app.world_mut()
+        .get_mut::<I18nText>(id)
+        .unwrap()
+        .set_num_arg("count", 2000.3);
+    app.update();
+    assert_eq!(text(&app, id), "You have 2,000.3 cats");
+}
+
+#[cfg(feature = "yaml")]
+#[test]
+fn set_key_retranslates() {
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nText::new("hello").with_locale("en"));
+    assert_eq!(text(&app, id), "Hello world");
+
+    app.world_mut()
+        .get_mut::<I18nText>(id)
+        .unwrap()
+        .set_key("text2d");
+    app.update();
+    assert_eq!(text(&app, id), "Hello World (Text2d)");
+}
+
+#[cfg(feature = "plurals")]
+#[test]
+fn set_count_retranslates() {
+    let mut app = ready_app();
+    let id = spawn_text(
+        &mut app,
+        I18nText::new("cats").with_count(1).with_locale("en"),
+    );
+    assert_eq!(text(&app, id), "You have 1 cat");
+
+    app.world_mut()
+        .get_mut::<I18nText>(id)
+        .unwrap()
+        .set_count(3);
+    app.update();
+    assert_eq!(text(&app, id), "You have 3 cats");
+}
+
+#[cfg(feature = "numbers")]
+#[test]
+fn set_number_reformats() {
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nNumber::new(1.5).with_locale("de"));
+    assert_eq!(text(&app, id), "1,5");
+
+    app.world_mut()
+        .get_mut::<I18nNumber>(id)
+        .unwrap()
+        .set_number(24501.2);
+    app.update();
+    assert_eq!(text(&app, id), "24.501,2");
+}
+
+#[cfg(feature = "yaml")]
+#[test]
+fn invalid_set_locale_keeps_previous() {
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nText::new("hello").with_locale("ja"));
+    assert_eq!(text(&app, id), "こんにちは世界");
+
+    app.world_mut()
+        .get_mut::<I18nText>(id)
+        .unwrap()
+        .set_locale("not a locale!");
+    app.update();
+    assert_eq!(text(&app, id), "こんにちは世界");
 }
 
 #[cfg(feature = "numbers")]

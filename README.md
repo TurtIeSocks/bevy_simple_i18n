@@ -134,6 +134,19 @@ the same key for the same locale, the file listed **later in the manifest wins**
 commands.spawn(I18nText::new("hello"));
 ```
 
+### Rich Text Spans
+
+`I18nTextSpan` translates a `TextSpan` child, so a paragraph can mix
+independently translated, independently styled pieces. Spawn it as a child of
+an entity with `Text` (or `Text2d`):
+
+```rust
+commands.spawn(I18nText::new("greeting")).with_child((
+    I18nTextSpan::new("player_name_label").with_arg("name", "Alex"),
+    TextColor(Color::srgb(1.0, 0.8, 0.2)),
+));
+```
+
 ### Number Localization
 
 ```rust
@@ -180,6 +193,24 @@ commands.spawn((I18nText::new("hello"), I18nFont::new("NotoSans")));
 
 When the locale is `ja`, `ja.ttf` is used. A locale without its own file walks up the
 locale chain (`zh-TW` → `zh`) and finally lands on `fallback.ttf`.
+
+### Updating Text at Runtime
+
+Every field has an in-place `&mut self` setter, so a score counter can update
+through a normal query instead of re-inserting a whole new component — Bevy's
+change detection re-renders it automatically:
+
+```rust
+fn update_score(mut query: Query<&mut I18nText, With<ScoreLabel>>, score: Res<Score>) {
+    for mut text in &mut query {
+        text.set_num_arg("points", score.0);
+    }
+}
+```
+
+`set_key`, `set_locale`, `set_arg`, `clear_args` and (with `plurals`)
+`set_count` are also available; `set_arg`/`set_num_arg` upsert by name rather
+than appending a duplicate.
 
 ### Automatic Text Re-Rendering
 

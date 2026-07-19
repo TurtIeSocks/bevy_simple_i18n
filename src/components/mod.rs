@@ -8,6 +8,7 @@ mod i18n_font;
 mod i18n_number;
 mod i18n_text;
 mod i18n_text_2d;
+mod i18n_text_span;
 pub(crate) mod utils;
 
 pub use i18n_font::*;
@@ -15,6 +16,7 @@ pub use i18n_font::*;
 pub use i18n_number::*;
 pub use i18n_text::*;
 pub use i18n_text_2d::*;
+pub use i18n_text_span::*;
 
 /// Trait implemented by every component that `bevy_simple_i18n` keeps translated.
 ///
@@ -140,12 +142,7 @@ macro_rules! define_i18n_text_component {
             /// validation. An invalid locale is ignored (logged as an error) and the
             /// global locale is used instead.
             pub fn with_locale(mut self, locale: impl Into<String>) -> Self {
-                let raw: String = locale.into();
-                let normalized = raw.replace('_', "-");
-                match normalized.parse::<icu_locale_core::Locale>() {
-                    Ok(_) => self.locale = Some(normalized),
-                    Err(err) => bevy::log::error!("Ignoring invalid locale {raw:?}: {err}"),
-                }
+                self.set_locale(locale);
                 self
             }
 
@@ -174,6 +171,73 @@ macro_rules! define_i18n_text_component {
                     ));
                 }
                 self
+            }
+
+            /// Replaces the translation key in place.
+            pub fn set_key(&mut self, key: impl Into<String>) {
+                self.key = key.into();
+            }
+
+            /// Set the locale for this specific translation, in place.
+            ///
+            /// Underscore-separated tags (`en_US`) are normalized to hyphens before
+            /// validation. An invalid locale is ignored (logged as an error) and the
+            /// previous locale is left unchanged.
+            pub fn set_locale(&mut self, locale: impl Into<String>) {
+                let raw: String = locale.into();
+                let normalized = raw.replace('_', "-");
+                match normalized.parse::<icu_locale_core::Locale>() {
+                    Ok(_) => self.locale = Some(normalized),
+                    Err(err) => bevy::log::error!("Ignoring invalid locale {raw:?}: {err}"),
+                }
+            }
+
+            /// Sets a standard string interpolation argument, in place.
+            ///
+            /// If an argument with the same `key` already exists, its value is replaced
+            /// in place (preserving position — interpolation is first-match-wins);
+            /// otherwise the argument is appended.
+            pub fn set_arg(&mut self, key: impl Into<String>, value: impl ToString) {
+                let key = key.into();
+                let value = crate::components::InterpolationType::String(value.to_string());
+                match self.args.iter_mut().find(|entry| entry.0 == key) {
+                    Some(entry) => entry.1 = value,
+                    None => self.args.push((key, value)),
+                }
+            }
+
+            #[cfg(feature = "numbers")]
+            /// Sets a number interpolation argument, in place.
+            ///
+            /// Upserts like [`Self::set_arg`]. A NaN/infinite value is a data bug worth
+            /// an error log, not a crash: the argument is left unchanged (or simply not
+            /// added, if it didn't already exist).
+            pub fn set_num_arg(&mut self, key: impl Into<String>, value: impl Into<f64>) {
+                let Some(fd) = crate::components::utils::try_f64_to_fd(value.into()) else {
+                    return;
+                };
+                let key = key.into();
+                let value = crate::components::InterpolationType::Number(fd);
+                match self.args.iter_mut().find(|entry| entry.0 == key) {
+                    Some(entry) => entry.1 = value,
+                    None => self.args.push((key, value)),
+                }
+            }
+
+            /// Removes all interpolation arguments.
+            pub fn clear_args(&mut self) {
+                self.args.clear();
+            }
+
+            #[cfg(feature = "plurals")]
+            /// Sets the plural count in place (see [`Self::with_count`] for resolution
+            /// order). A NaN/infinite value is a data bug worth an error log, not a
+            /// crash: the count is left unchanged rather than reset to `None`, so an
+            /// invalid update never destroys previously valid state.
+            pub fn set_count(&mut self, count: impl Into<f64>) {
+                if let Some(fd) = crate::components::utils::try_f64_to_fd(count.into()) {
+                    self.count = Some(fd);
+                }
             }
         }
     };
