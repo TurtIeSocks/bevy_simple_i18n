@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - Unreleased
+## [0.4.0] - 2026-07-19
 
 ### Changed
 
@@ -44,6 +44,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `key.0` > CLDR category `key.one`/`key.few`/… via `icu_plurals` > `key.other` >
   bare key) and inject a localized `%{count}` argument. Plural forms are ordinary
   nested keys — no locale-file syntax change.
+
+### Fixed
+
+- **Invalid input no longer crashes the game.** Unparseable locales handed to
+  `.with_locale(...)` (including `en_US`-style underscore tags, which are now
+  normalized to hyphens and accepted), invalid manifest `fallback` entries, and
+  non-finite (`NaN`/infinite) values in `I18nNumber::new` / `.with_num_arg(...)`
+  all log an error and degrade gracefully instead of panicking. The number
+  formatter is also now built lazily — only when a number actually needs
+  formatting — instead of on every translation.
+- The `changing_locale` example and the web demo spawn their locale-switcher
+  buttons once translations finish loading; previously they enumerated locales
+  at startup, which is always empty now that locale files load asynchronously.
 
 ### Breaking changes
 

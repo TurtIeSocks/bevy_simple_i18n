@@ -2,6 +2,7 @@
 name = "bevy_simple_i18n"
 version = "0.4.0"
 edition = "2021"
+rust-version = "1.95.0"
 authors = ["TurtIeSocks"]
 license = "MIT OR Apache-2.0"
 description = "Bevy i18n plugin"
@@ -11,6 +12,9 @@ keywords = ["bevy", "gamedev", "i18n", "localization"]
 categories = ["game-development", "localization"]
 readme = "./README.md"
 exclude = ["assets/"]
+
+[package.metadata.docs.rs]
+all-features = true
 
 [workspace]
 members = ["web"]

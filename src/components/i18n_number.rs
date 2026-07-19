@@ -29,8 +29,10 @@ use super::{utils, I18nComponent};
 #[reflect(Component)]
 #[require(Text)]
 pub struct I18nNumber {
+    /// `None` when constructed from a NaN/infinite value (logged at construction
+    /// time); renders as an empty string rather than crashing the game.
     #[reflect(ignore)]
-    pub(crate) fixed_decimal: Decimal,
+    pub(crate) fixed_decimal: Option<Decimal>,
     /// Locale for this specific translation, `None` to use the global locale
     pub(crate) locale: Option<String>,
 }
@@ -43,23 +45,39 @@ impl I18nComponent for I18nNumber {
     }
 
     fn translate(&self, i18n: &crate::prelude::I18n) -> String {
-        utils::get_formatter(self.locale(i18n), &self.fixed_decimal)
-            .format_to_string(&self.fixed_decimal)
+        let Some(fixed_decimal) = &self.fixed_decimal else {
+            return String::new();
+        };
+        utils::get_formatter(self.locale(i18n), fixed_decimal)
+            .map(|f| f.format_to_string(fixed_decimal))
+            .unwrap_or_else(|| fixed_decimal.to_string())
     }
 }
 
 impl I18nNumber {
-    /// Creates a new `I18nNumber` component with the provided number value
+    /// Creates a new `I18nNumber` component with the provided number value.
+    ///
+    /// A NaN/infinite value is a data bug worth an error log, not a crash: it
+    /// renders as an empty string instead.
     pub fn new(number: impl Into<f64>) -> Self {
         Self {
-            fixed_decimal: utils::f64_to_fd(number.into()),
+            fixed_decimal: utils::try_f64_to_fd(number.into()),
             locale: None,
         }
     }
 
-    /// Set the locale for this specific translation
+    /// Set the locale for this specific translation.
+    ///
+    /// Underscore-separated tags (`en_US`) are normalized to hyphens before
+    /// validation. An invalid locale is ignored (logged as an error) and the
+    /// global locale is used instead.
     pub fn with_locale(mut self, locale: impl Into<String>) -> Self {
-        self.locale = Some(locale.into());
+        let raw: String = locale.into();
+        let normalized = raw.replace('_', "-");
+        match normalized.parse::<icu_locale_core::Locale>() {
+            Ok(_) => self.locale = Some(normalized),
+            Err(err) => bevy::log::error!("Ignoring invalid locale {raw:?}: {err}"),
+        }
         self
     }
 }

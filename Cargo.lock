@@ -1478,7 +1478,7 @@ dependencies = [
 
 [[package]]
 name = "bevy_simple_i18n_web"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bevy",
  "bevy_simple_i18n",

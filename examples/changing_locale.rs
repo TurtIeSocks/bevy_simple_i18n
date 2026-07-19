@@ -2,16 +2,20 @@ use bevy::prelude::*;
 
 use bevy_simple_i18n::prelude::*;
 
+/// Marks the container the locale buttons are (re)built under.
+#[derive(Component)]
+struct LocaleButtonRow;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_plugins(I18nPlugin::default())
         .add_systems(Startup, setup)
-        .add_systems(Update, button_system)
+        .add_systems(Update, (button_system, spawn_locale_buttons))
         .run();
 }
 
-fn setup(mut commands: Commands, i18n_res: Res<I18n>) {
+fn setup(mut commands: Commands) {
     commands.spawn(Camera2d);
     commands
         .spawn(Node {
@@ -96,8 +100,10 @@ fn setup(mut commands: Commands, i18n_res: Res<I18n>) {
                     ));
                 });
 
-            parent
-                .spawn(Node {
+            // Locale buttons are spawned by `spawn_locale_buttons` once the
+            // translation table has loaded (assets are async as of 0.4).
+            parent.spawn((
+                Node {
                     display: Display::Flex,
                     align_items: AlignItems::Center,
                     justify_content: JustifyContent::Center,
@@ -105,35 +111,52 @@ fn setup(mut commands: Commands, i18n_res: Res<I18n>) {
                     row_gap: Val::Px(10.),
                     column_gap: Val::Px(10.),
                     ..default()
-                })
-                .with_children(|parent| {
-                    for locale in i18n_res.locales() {
-                        parent
-                            .spawn((
-                                Button,
-                                Node {
-                                    min_width: Val::Px(200.0),
-                                    padding: UiRect::all(Val::Px(10.0)),
-                                    border: UiRect::all(Val::Px(5.0)),
-                                    justify_content: JustifyContent::Center,
-                                    align_items: AlignItems::Center,
-                                    border_radius: BorderRadius::MAX,
-                                    ..default()
-                                },
-                                BorderColor::all(Color::BLACK),
-                                BackgroundColor(Color::srgb(0.15, 0.15, 0.15)),
-                            ))
-                            .with_child((
-                                Text::new(locale),
-                                TextFont {
-                                    font_size: FontSize::Px(50.0),
-                                    ..default()
-                                },
-                                TextColor(Color::srgb(0.9, 0.9, 0.9)),
-                            ));
-                    }
-                });
+                },
+                LocaleButtonRow,
+            ));
         });
+}
+
+/// (Re)builds one button per available locale. `I18n` changes when the
+/// translation table is built or rebuilt, so this also picks up locales added
+/// by hot reload.
+fn spawn_locale_buttons(
+    mut commands: Commands,
+    i18n: Res<I18n>,
+    row: Single<Entity, With<LocaleButtonRow>>,
+) {
+    if !i18n.is_changed() {
+        return;
+    }
+    let mut row = commands.entity(*row);
+    row.despawn_related::<Children>();
+    row.with_children(|parent| {
+        for locale in i18n.locales() {
+            parent
+                .spawn((
+                    Button,
+                    Node {
+                        min_width: Val::Px(200.0),
+                        padding: UiRect::all(Val::Px(10.0)),
+                        border: UiRect::all(Val::Px(5.0)),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border_radius: BorderRadius::MAX,
+                        ..default()
+                    },
+                    BorderColor::all(Color::BLACK),
+                    BackgroundColor(Color::srgb(0.15, 0.15, 0.15)),
+                ))
+                .with_child((
+                    Text::new(locale),
+                    TextFont {
+                        font_size: FontSize::Px(50.0),
+                        ..default()
+                    },
+                    TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                ));
+        }
+    });
 }
 
 #[allow(clippy::type_complexity)]

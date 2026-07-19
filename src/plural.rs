@@ -45,21 +45,25 @@ pub(crate) fn resolve_plural_key(
             }
         }
 
-        // CLDR category with THIS locale's rules (en: 1 -> one; pl: few/many; …).
-        let parsed = crate::components::utils::resolve_locale(candidate_locale, key);
-        if let Ok(rules) = icu_plurals::PluralRules::try_new_cardinal((&parsed).into()) {
-            use icu_plurals::PluralCategory as C;
-            let name = match rules.category_for(count) {
-                C::Zero => "zero",
-                C::One => "one",
-                C::Two => "two",
-                C::Few => "few",
-                C::Many => "many",
-                C::Other => "other",
-            };
-            let candidate = format!("{key}.{name}");
-            if i18n.lookup_exact(candidate_locale, &candidate).is_some() {
-                return candidate;
+        // CLDR category with THIS locale's rules (en: 1 -> one; pl: few/many; …). An
+        // unparseable candidate locale (e.g. a bad manifest `fallback` entry) is
+        // skipped, not fatal: the loop still tries `other` / bare-key for it, then
+        // moves on to the next candidate locale.
+        if let Some(parsed) = crate::components::utils::resolve_locale(candidate_locale, key) {
+            if let Ok(rules) = icu_plurals::PluralRules::try_new_cardinal((&parsed).into()) {
+                use icu_plurals::PluralCategory as C;
+                let name = match rules.category_for(count) {
+                    C::Zero => "zero",
+                    C::One => "one",
+                    C::Two => "two",
+                    C::Few => "few",
+                    C::Many => "many",
+                    C::Other => "other",
+                };
+                let candidate = format!("{key}.{name}");
+                if i18n.lookup_exact(candidate_locale, &candidate).is_some() {
+                    return candidate;
+                }
             }
         }
 
@@ -82,8 +86,13 @@ pub(crate) fn resolve_plural_key(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::components::utils::f64_to_fd;
     use crate::parse::Table;
+
+    /// Test-only infallible wrapper: every value used below is a finite literal, so
+    /// unwrapping `try_f64_to_fd` (the crate's non-panicking conversion) is safe here.
+    fn f64_to_fd(value: f64) -> fixed_decimal::Decimal {
+        crate::components::utils::try_f64_to_fd(value).expect("test literal is finite")
+    }
 
     /// I18n whose `en` table has the given flat keys.
     fn i18n_with(keys: &[&str]) -> I18n {
@@ -201,6 +210,27 @@ mod tests {
 
         assert_eq!(
             resolve_plural_key(&i18n, "ja", "cats", &f64_to_fd(1.0)),
+            "cats"
+        );
+    }
+
+    #[test]
+    fn invalid_manifest_fallback_does_not_panic() {
+        // The manifest's `fallback` list is runtime data (editable by modders/language
+        // packs) and is stored unvalidated. "en" ships no "cats" keys at all, so
+        // resolution walks past it to the invalid fallback locale "!!bad!!" — which
+        // must not panic when the CLDR-category lookup tries to parse it — and then
+        // falls through to the usual full-miss bare-key echo.
+        let mut i18n = I18n::default();
+        let table: Table = [(
+            "en".to_string(),
+            [("unrelated".to_string(), "value".to_string())].into(),
+        )]
+        .into();
+        i18n.apply_table(table, "en", vec!["!!bad!!".to_string()], true);
+
+        assert_eq!(
+            resolve_plural_key(&i18n, "en", "cats", &f64_to_fd(1.0)),
             "cats"
         );
     }

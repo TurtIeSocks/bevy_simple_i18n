@@ -131,6 +131,32 @@ fn locale_truncation_chain_resolves_parent_locales() {
     assert_eq!(text(&app, en), "Hello world");
 }
 
+#[cfg(feature = "yaml")]
+#[test]
+fn underscore_locale_is_normalized_not_fatal() {
+    // Every platform's locale API encourages `en_US`-style underscores; `with_locale`
+    // must normalize to hyphens instead of handing an unparseable tag to the icu
+    // formatter (which used to panic on it).
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nText::new("hello").with_locale("ja_JP"));
+
+    assert_eq!(text(&app, id), "こんにちは世界");
+}
+
+#[cfg(feature = "yaml")]
+#[test]
+fn invalid_locale_falls_back_to_global_not_panic() {
+    // A locale that isn't a BCP-47 tag at all: logged and ignored, `self.locale` stays
+    // `None`, so the entity renders with the global locale instead of crashing.
+    let mut app = ready_app();
+    let id = spawn_text(
+        &mut app,
+        I18nText::new("hello").with_locale("not a locale!"),
+    );
+
+    assert_eq!(text(&app, id), "Hello world");
+}
+
 #[test]
 fn missing_key_echoes_the_key_verbatim() {
     let mut app = ready_app();
@@ -302,6 +328,34 @@ fn number_interpolation_arguments_are_localized() {
     );
 
     assert_eq!(text(&app, id), "You have 2,000.3 cats");
+}
+
+#[cfg(feature = "numbers")]
+#[test]
+fn nan_number_renders_empty_not_panic() {
+    // A NaN/infinite I18nNumber is a data bug, not a crash: it logs an error at
+    // construction time and renders as an empty string.
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nNumber::new(f64::NAN));
+
+    assert_eq!(text(&app, id), "");
+}
+
+#[cfg(all(feature = "numbers", feature = "yaml"))]
+#[test]
+fn nan_num_arg_leaves_pattern_verbatim() {
+    // A non-finite `with_num_arg` value is logged and skipped (not pushed as an
+    // interpolation arg), so the `%{count}` pattern stays verbatim — the crate's
+    // established "visible, not invisible" failure mode.
+    let mut app = ready_app();
+    let id = spawn_text(
+        &mut app,
+        I18nText::new("messages.cats")
+            .with_num_arg("count", f64::INFINITY)
+            .with_locale("en"),
+    );
+
+    assert_eq!(text(&app, id), "You have %{count} cats");
 }
 
 #[test]
