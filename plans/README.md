@@ -21,6 +21,10 @@ green in CI.
 | 001  | Locale buttons appear after translations load (example + web demo) | P1 | S | — | DONE (2026-07-19, merge `2d5a778`; executor + 2 verifiers + advisor all APPROVE) |
 | 002  | Panic-proof user-supplied locales & numbers; lazy formatter | P1 | M | — | DONE (2026-07-19, merge `f652a27`; 6 new regression tests; all APPROVE) |
 | 003  | CI modernization: clippy/fmt/wasm gates, caching, publish toolchain | P2 | S | — | DONE (2026-07-19, merge `6707cc5`; note: `cargo publish --dry-run` skipped for transient host disk-full, `cargo package --list` fallback passed per plan contingency) |
+| 004  | Dedupe `I18nText`/`I18nText2d` behind one macro (behavior-preserving) | P2 | M | — | TODO |
+| 005  | `I18nTextSpan` — translated rich-text spans | P2 | S | 004 | TODO |
+| 006  | Runtime mutators (`set_key`/`set_arg`/`set_count`/`set_number`) | P2 | M | 004 | TODO |
+| 007  | Warn once per missing (locale, key) | P3 | S | — | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
@@ -34,38 +38,32 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 
 ## Dependency notes
 
-- No hard dependencies between the three plans; they touch disjoint files and
-  can run in parallel worktrees.
-- 003 should land **before tagging v0.4.0** — `publish.yml` currently uses the
-  archived `actions-rs/toolchain` action and would run it at release time.
-- If 002 lands first, 003's "clippy clean at baseline" assumption must be
-  re-verified (002's done criteria already require clippy clean, so this is
-  expected to hold).
+- 001–003: no hard dependencies; executed in parallel worktrees (2026-07-19).
+- 003 landed **before tagging v0.4.0** — `publish.yml` used the archived
+  `actions-rs/toolchain` action and would have run it at release time.
+- 005 and 006 both require 004 (they extend/invoke its macro). 005 and 006
+  also touch the same files (`src/components/mod.rs`), so they must run in
+  ONE executor sequentially, not in parallel worktrees.
+- 007 is independent of 004–006 (disjoint files: `resources.rs` + `utils.rs`)
+  and can run in parallel with 004.
 
 ## Audited but not planned (candidates for a next round)
 
-- **Ship 0.4.0** — the entire rewrite is merged but `CHANGELOG.md` still says
-  "Unreleased" and crates.io is at 0.3.0. Process: set the release date in the
-  changelog, tag `v0.4.0`, let `publish.yml` run (after plan 003).
-- **Runtime mutators** (`set_count`, `set_arg`, `set_key` on
-  `I18nText`/`I18nText2d`/`I18nNumber`) — today a score counter must re-insert
-  a whole new component each change; `&mut` setters would trigger change
-  detection naturally. Effort S.
-- **`I18nTextSpan` component** — `I18nComponent::Target` already supports any
-  `DerefMut<Target = String>` component; a built-in `#[require(TextSpan)]`
-  twin of `I18nText` would unlock rich text (mixed styles inline). Effort S.
+- ~~Ship 0.4.0~~ — DONE 2026-07-19: changelog dated, `v0.4.0` tagged at PR
+  #11's head, publish workflow triggered.
+- ~~Runtime mutators~~ — planned as 006.
+- ~~`I18nTextSpan`~~ — planned as 005.
+- ~~Warn-once missing-key logging~~ — planned as 007.
+- ~~Dedupe `I18nText` / `I18nText2d`~~ — planned as 004 (rule of three arrived
+  with 005/006).
 - **Formatter/plural-rules caching per locale** — `DecimalFormatter` and
   `PluralRules` are rebuilt per translate call (post-002: only when needed);
   a locale-keyed cache resource would help locale switches with thousands of
   text entities. Effort M, only worth it with a demonstrated hot path.
-- **Warn-once missing-key logging** — `translate_resolved`
-  (`src/components/utils.rs:103`) warns on every retranslate of every missing
-  key; a seen-set would stop log spam in big scenes. Effort S.
-- **Dedupe `I18nText` / `I18nText2d`** — ~120-line near-identical files;
-  a `macro_rules!` could halve them. Cosmetic; the duplication is stable.
 - **`I18nNumber` precision** — `impl Into<f64>` constructor loses integer
   precision above 2^53; a `Decimal`/integer-preserving constructor variant
-  would fix it. Low demand until someone renders 64-bit currency values.
+  would fix it. Low demand until someone renders 64-bit currency values; also
+  an API-design question for the maintainer (which constructor shape).
 
 ## Findings considered and rejected
 
