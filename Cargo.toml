@@ -28,6 +28,10 @@ toml = ["dep:serde_toml"]
 detect = ["dep:bevy_device_lang"]
 # CLDR plural categories for .with_count() (needs numbers for %{count} formatting)
 plurals = ["numbers", "dep:icu_plurals"]
+# I18nTarget impl for bevy_rich_text3d's FetchedTextSegment + the
+# I18nText3dSegment component. Off by default: it pins a third-party
+# release cadence.
+rich_text3d = ["dep:bevy_rich_text3d"]
 
 [dependencies]
 bevy = { version = "0.19", default-features = false, features = [
@@ -51,6 +55,7 @@ thiserror = "2"
 
 # bevy-independent (jni/objc2/web-sys per platform), so it can't lag bevy releases
 bevy_device_lang = { version = "0.6", optional = true }
+bevy_rich_text3d = { version = "0.7", optional = true }
 
 fixed_decimal = { version = "0.7", optional = true }
 # `alloc` gates DecimalFormatter::format_to_string in icu_decimal 2.x
@@ -69,3 +74,8 @@ required-features = ["numbers"]
 name = "changing_locale"
 path = "examples/changing_locale.rs"
 required-features = ["numbers"]
+
+[[example]]
+name = "rich_text_3d"
+path = "examples/rich_text_3d.rs"
+required-features = ["rich_text3d"]

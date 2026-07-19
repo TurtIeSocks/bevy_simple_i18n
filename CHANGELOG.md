@@ -21,9 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Missing-translation warnings are now deduplicated: the first miss of a
   (locale, key) pair logs a warning, repeats log at debug level, and the
   seen-set resets when the translation table is rebuilt (hot reload).
-- **`I18nTarget` trait** — implement it to drive any third-party
-  `String`-carrying text component (e.g. `bevy_rich_text3d`'s
-  `FetchedTextSegment`) with the full i18n pipeline.
+- **`I18nTarget` trait** — implement it for your own component to drive any
+  third-party `String`-carrying text component with the full i18n pipeline.
+  (Implementing it for a *foreign* type like `bevy_rich_text3d`'s
+  `FetchedTextSegment` from your own crate hits the orphan rule — see the
+  `rich_text3d` feature below.)
+- **`rich_text3d` feature** (off by default) — `I18nText3dSegment`, the
+  `I18nTarget` impl for `bevy_rich_text3d`'s `FetchedTextSegment`, and a
+  runnable example (`examples/rich_text_3d.rs`). Only this crate, which owns
+  `I18nTarget`, can provide that impl for a foreign type without hitting the
+  orphan rule.
 
 ### Changed
 

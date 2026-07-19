@@ -91,6 +91,10 @@ impl Plugin for I18nPlugin {
         #[cfg(feature = "numbers")]
         app.register_type::<crate::components::I18nNumber>()
             .register_i18n_component::<crate::components::I18nNumber>();
+
+        #[cfg(feature = "rich_text3d")]
+        app.register_type::<crate::components::I18nText3dSegment>()
+            .register_i18n_component::<crate::components::I18nText3dSegment>();
     }
 }
 

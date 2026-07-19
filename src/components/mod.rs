@@ -6,6 +6,8 @@ mod i18n_font;
 mod i18n_number;
 mod i18n_text;
 mod i18n_text_2d;
+#[cfg(feature = "rich_text3d")]
+mod i18n_text_3d_segment;
 mod i18n_text_span;
 pub(crate) mod utils;
 
@@ -14,6 +16,8 @@ pub use i18n_font::*;
 pub use i18n_number::*;
 pub use i18n_text::*;
 pub use i18n_text_2d::*;
+#[cfg(feature = "rich_text3d")]
+pub use i18n_text_3d_segment::*;
 pub use i18n_text_span::*;
 
 /// A text component `bevy_simple_i18n` can write translated strings into.
