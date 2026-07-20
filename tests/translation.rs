@@ -593,7 +593,10 @@ fn closure_writer_drives_foreign_component() {
 
     app.world_mut().resource_mut::<I18n>().set_locale("en");
     app.update();
-    assert_eq!(app.world().get::<ForeignLabel>(id).unwrap().0, "Hello world");
+    assert_eq!(
+        app.world().get::<ForeignLabel>(id).unwrap().0,
+        "Hello world"
+    );
 
     app.world_mut().resource_mut::<I18n>().set_locale("ja");
     app.update();
