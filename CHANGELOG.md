@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`fontmesh` feature** (off by default) — `I18nTextMesh`, the `I18nTarget`
   impl for `bevy_fontmesh`'s `TextMesh`, and a runnable example
   (`examples/font_mesh.rs`).
+- **`I18nKey` + `register_i18n_writer`** — a target-less translation-key
+  driver plus closure-based registration for driving ANY foreign text
+  component through the full i18n pipeline (interpolation, plurals,
+  per-entity locale) without an `I18nTarget` impl. Sidesteps the orphan
+  rule entirely for third-party crates this crate doesn't ship a dedicated
+  feature for.
 
 ### Changed
 

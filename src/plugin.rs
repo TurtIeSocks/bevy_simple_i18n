@@ -3,9 +3,11 @@ use std::path::Path;
 use bevy::asset::{AssetLoadFailedEvent, AssetPath};
 use bevy::prelude::*;
 
+use bevy::ecs::component::Mutable;
+
 use crate::{
     assets::{I18nManifest, I18nManifestLoader, TranslationFile, TranslationFileLoader},
-    components::{I18nFont, I18nTarget, I18nText, I18nText2d, I18nTextSpan},
+    components::{I18nFont, I18nKey, I18nTarget, I18nText, I18nText2d, I18nTextSpan},
     parse,
     prelude::I18nComponent,
     resources::{FontFolder, FontManager, I18n},
@@ -65,6 +67,7 @@ impl Plugin for I18nPlugin {
             .register_type::<I18nText2d>()
             .register_type::<I18nTextSpan>()
             .register_type::<I18nFont>()
+            .register_type::<I18nKey>()
             .init_asset::<TranslationFile>()
             .init_asset::<I18nManifest>()
             .register_asset_loader(TranslationFileLoader)
@@ -105,11 +108,40 @@ impl Plugin for I18nPlugin {
 pub trait I18nComponentRegistration {
     /// Registers an i18n component for automatic translation updates
     fn register_i18n_component<T: I18nComponent>(&mut self) -> &mut Self;
+
+    /// Registers a closure that writes translated text (driven by an [`I18nKey`]
+    /// on the same entity) into `Target` — for third-party components this crate
+    /// has no [`I18nTarget`](crate::prelude::I18nTarget) impl for. The closure
+    /// runs whenever the locale, translation table, or the entity's `I18nKey`
+    /// changes.
+    fn register_i18n_writer<Target, F>(&mut self, writer: F) -> &mut Self
+    where
+        Target: Component<Mutability = Mutable>,
+        F: Fn(&mut Target, String) + Send + Sync + 'static;
 }
 
 impl I18nComponentRegistration for App {
     fn register_i18n_component<T: I18nComponent>(&mut self) -> &mut Self {
         self.add_systems(Update, update_translations::<T>)
+    }
+
+    fn register_i18n_writer<Target, F>(&mut self, writer: F) -> &mut Self
+    where
+        Target: Component<Mutability = Mutable>,
+        F: Fn(&mut Target, String) + Send + Sync + 'static,
+    {
+        self.add_systems(
+            Update,
+            move |i18n: Res<I18n>, mut query: Query<(&mut Target, Ref<I18nKey>)>| {
+                let i18n_changed = i18n.is_changed();
+                for (mut target, key) in query.iter_mut() {
+                    if !i18n_changed && !key.is_changed() {
+                        continue;
+                    }
+                    writer(&mut target, key.translate(&i18n));
+                }
+            },
+        )
     }
 }
 

@@ -367,6 +367,23 @@ example. Same orphan-rule reasoning as `bevy_rich_text3d` above: `TextMesh`
 is bevy_fontmesh's foreign type, so only this crate (which owns
 [`I18nTarget`]) can provide that impl.
 
+### Any other crate: closure writers
+
+For a third-party text component this crate has no dedicated feature for,
+`register_i18n_writer` sidesteps the orphan rule entirely: behavior passed
+as a closure needs no trait impl. Pair it with [`I18nKey`] — a translation-key
+driver with no built-in render target, so it never drags in an unrelated
+`Text`/`Mesh3d` requirement:
+
+```rust,ignore
+app.register_i18n_writer::<SomeLabel>(|label, text| label.0 = text);
+commands.spawn((I18nKey::new("hello").with_arg("name", "X"), SomeLabel::default()));
+```
+
+This gets the full pipeline (interpolation, plurals, per-entity locale,
+setters, warn-once) with zero coherence issues and zero new features in
+this crate.
+
 ## Migrating from 0.3
 
 1. Add a manifest at `assets/locales/i18n.ron` listing your locale files (see
