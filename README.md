@@ -271,8 +271,9 @@ fn loading_screen_done(i18n: Res<I18n>) -> bool {
 
 ### `I18nComponent`
 
-Implement this for your own component to drive any `String`-carrying text component
-from a translation key. Both methods receive the [`I18n`] resource:
+Implement this for your own component to drive any text component implementing
+[`I18nTarget`] from a translation key (Bevy's `Text`, `Text2d` and `TextSpan` all
+implement it out of the box). Both methods receive the [`I18n`] resource:
 
 ```rust
 impl I18nComponent for MyLabel {
@@ -293,6 +294,95 @@ Registers your component for automatic re-translation (and dynamic font support)
 ```rust
 app.register_i18n_component::<MyLabel>();
 ```
+
+### Third-party text components (bevy_rich_text3d)
+
+Enable the `rich_text3d` feature and this crate provides `I18nText3dSegment` —
+a ready-made component that drives
+[`bevy_rich_text3d`](https://docs.rs/bevy_rich_text3d)'s `FetchedTextSegment`
+through the full i18n pipeline (interpolation, plurals, per-entity locales),
+same as `I18nText`/`I18nText2d`/`I18nTextSpan`:
+
+```toml
+bevy_simple_i18n = { version = "...", features = ["rich_text3d"] }
+```
+
+```rust,ignore
+// The translated segment: bevy_simple_i18n keeps this entity's
+// FetchedTextSegment in sync with the "hello" key.
+let segment = commands.spawn(I18nText3dSegment::new("hello")).id();
+
+commands.spawn((
+    Text3d::from_extract(segment),
+    Text3dStyling { size: 64.0, ..Default::default() },
+    Mesh3d::default(),
+    MeshMaterial3d(materials.add(StandardMaterial {
+        base_color_texture: Some(TextAtlas::DEFAULT_IMAGE.clone()),
+        alpha_mode: AlphaMode::Blend,
+        unlit: true,
+        ..Default::default()
+    })),
+));
+```
+
+See [`examples/rich_text_3d.rs`](examples/rich_text_3d.rs) for the full
+runnable example.
+
+Why a feature instead of a doc recipe: [`I18nTarget`] is *our* trait, and
+`FetchedTextSegment` is bevy_rich_text3d's foreign type — a downstream crate
+implementing our trait for a type neither crate owns hits the orphan rule
+(E0117) and cannot compile anywhere. Only the crate that owns the trait can
+provide that impl. For a *different* third-party text component, implement
+[`I18nTarget`] for **your own** component types, or ask that crate (or this
+one) to add the impl.
+
+Note that [`I18nFont`] does not apply to `Text3d` — it styles fonts through
+`Text3dStyling`, not Bevy's `TextFont`.
+
+### Third-party text components (bevy_fontmesh)
+
+Enable the `fontmesh` feature and this crate provides `I18nTextMesh` — a
+ready-made component that drives
+[`bevy_fontmesh`](https://docs.rs/bevy_fontmesh)'s `TextMesh` through the
+full i18n pipeline (interpolation, plurals, per-entity locales), same as
+`I18nText`/`I18nText2d`/`I18nTextSpan`:
+
+```toml
+bevy_simple_i18n = { version = "...", features = ["fontmesh"] }
+```
+
+```rust,ignore
+// The translated mesh: bevy_simple_i18n keeps this entity's TextMesh in
+// sync with the "hello" key. A Mesh3d is inserted automatically; add your
+// own TextMesh alongside to set the font (and MeshMaterial3d to render it).
+commands.spawn((
+    I18nTextMesh::new("hello"),
+    TextMesh { font: asset_server.load("fonts/font.ttf"), ..default() },
+    MeshMaterial3d(materials.add(StandardMaterial::default())),
+));
+```
+
+See [`examples/font_mesh.rs`](examples/font_mesh.rs) for the full runnable
+example. Same orphan-rule reasoning as `bevy_rich_text3d` above: `TextMesh`
+is bevy_fontmesh's foreign type, so only this crate (which owns
+[`I18nTarget`]) can provide that impl.
+
+### Any other crate: closure writers
+
+For a third-party text component this crate has no dedicated feature for,
+`register_i18n_writer` sidesteps the orphan rule entirely: behavior passed
+as a closure needs no trait impl. Pair it with [`I18nKey`] — a translation-key
+driver with no built-in render target, so it never drags in an unrelated
+`Text`/`Mesh3d` requirement:
+
+```rust,ignore
+app.register_i18n_writer::<SomeLabel>(|label, text| label.0 = text);
+commands.spawn((I18nKey::new("hello").with_arg("name", "X"), SomeLabel::default()));
+```
+
+This gets the full pipeline (interpolation, plurals, per-entity locale,
+setters, warn-once) with zero coherence issues and zero new features in
+this crate.
 
 ## Migrating from 0.3
 
@@ -317,6 +407,8 @@ app.register_i18n_component::<MyLabel>();
 | `toml`    | yes     | `.toml` locale files                          |
 | `detect`  | yes     | system-locale auto-detect (`bevy_device_lang`) |
 | `plurals` | yes     | CLDR plural forms via `with_count` (icu4x)     |
+| `rich_text3d` | no  | `I18nText3dSegment` for `bevy_rich_text3d`     |
+| `fontmesh` | no     | `I18nTextMesh` for `bevy_fontmesh`             |
 
 ## Bevy support table
 

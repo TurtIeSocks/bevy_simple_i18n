@@ -21,6 +21,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Missing-translation warnings are now deduplicated: the first miss of a
   (locale, key) pair logs a warning, repeats log at debug level, and the
   seen-set resets when the translation table is rebuilt (hot reload).
+- **`I18nTarget` trait** — implement it for your own component to drive any
+  third-party `String`-carrying text component with the full i18n pipeline.
+  (Implementing it for a *foreign* type like `bevy_rich_text3d`'s
+  `FetchedTextSegment` from your own crate hits the orphan rule — see the
+  `rich_text3d` feature below.)
+- **`rich_text3d` feature** (off by default) — `I18nText3dSegment`, the
+  `I18nTarget` impl for `bevy_rich_text3d`'s `FetchedTextSegment`, and a
+  runnable example (`examples/rich_text_3d.rs`). Only this crate, which owns
+  `I18nTarget`, can provide that impl for a foreign type without hitting the
+  orphan rule.
+- **`fontmesh` feature** (off by default) — `I18nTextMesh`, the `I18nTarget`
+  impl for `bevy_fontmesh`'s `TextMesh`, and a runnable example
+  (`examples/font_mesh.rs`).
+- **`I18nKey` + `register_i18n_writer`** — a target-less translation-key
+  driver plus closure-based registration for driving ANY foreign text
+  component through the full i18n pipeline (interpolation, plurals,
+  per-entity locale) without an `I18nTarget` impl. Sidesteps the orphan
+  rule entirely for third-party crates this crate doesn't ship a dedicated
+  feature for.
 
 ### Changed
 
@@ -29,6 +48,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: disabled incremental compilation and switched to `line-tables-only`
   debuginfo — the windows-latest test job dropped from ~27 minutes of
   compile + cache churn.
+
+### Breaking changes
+
+- `I18nComponent::Target`'s bound changed from
+  `Component<Mutability = Mutable> + DerefMut<Target = String>` to
+  `I18nTarget`. Migration: implement `I18nTarget` for your target type —
+  three lines, e.g. `fn set_text(&mut self, text: String) { self.0 = text; }`
+  for a tuple struct (write whichever field holds your text); Bevy's
+  `Text`/`Text2d`/`TextSpan` are provided out of the box.
 
 ## [0.4.0] - 2026-07-19
 

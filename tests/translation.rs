@@ -55,6 +55,98 @@ fn spawn_text(app: &mut App, bundle: impl Bundle) -> Entity {
     id
 }
 
+/// Mock of a third-party text component (e.g. bevy_rich_text3d's
+/// `FetchedTextSegment`): holds a String but does NOT deref to it.
+#[derive(Component, Default)]
+struct MockSegment(String);
+
+impl I18nTarget for MockSegment {
+    fn set_text(&mut self, text: String) {
+        self.0 = text;
+    }
+}
+
+#[derive(Component)]
+#[require(MockSegment)]
+struct MockLabel(String);
+
+impl I18nComponent for MockLabel {
+    type Target = MockSegment;
+    fn locale<'a>(&'a self, i18n: &'a I18n) -> &'a str {
+        i18n.current()
+    }
+    fn translate(&self, i18n: &I18n) -> String {
+        i18n.translate(self.locale(i18n), &self.0)
+            .unwrap_or(&self.0)
+            .to_string()
+    }
+}
+
+#[cfg(feature = "yaml")]
+#[test]
+fn third_party_target_without_derefmut_translates() {
+    let mut app = test_app();
+    app.register_i18n_component::<MockLabel>();
+    advance_until_ready(&mut app);
+    let id = app.world_mut().spawn(MockLabel("hello".into())).id();
+    app.update();
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(app.world().get::<MockSegment>(id).unwrap().0, "Hello world");
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<MockSegment>(id).unwrap().0,
+        "こんにちは世界"
+    );
+}
+
+#[cfg(all(feature = "rich_text3d", feature = "yaml"))]
+#[test]
+fn rich_text3d_segment_translates_on_locale_change() {
+    use bevy_rich_text3d::FetchedTextSegment;
+
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nText3dSegment::new("hello"));
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(
+        app.world().get::<FetchedTextSegment>(id).unwrap().as_str(),
+        "Hello world"
+    );
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<FetchedTextSegment>(id).unwrap().as_str(),
+        "こんにちは世界"
+    );
+}
+
+#[cfg(all(feature = "fontmesh", feature = "yaml"))]
+#[test]
+fn fontmesh_text_translates_on_locale_change() {
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nTextMesh::new("hello"));
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(
+        app.world().get::<bevy_fontmesh::TextMesh>(id).unwrap().text,
+        "Hello world"
+    );
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<bevy_fontmesh::TextMesh>(id).unwrap().text,
+        "こんにちは世界"
+    );
+}
+
 // Several vectors assert values that v2_example.yml (later in the manifest) overrides;
 // they only hold when the YAML file actually loads, hence the `yaml` feature gates.
 
@@ -479,5 +571,60 @@ fn dynamic_font_family_is_applied_from_the_manifest() {
         format!("{font:?}"),
         format!("{default_font:?}"),
         "I18nFont should have swapped the font source for the ja locale"
+    );
+}
+
+/// Foreign component with NO `I18nTarget` impl, NO `Deref` — the shape
+/// `register_i18n_writer` targets (a crate that can't get an `I18nTarget`
+/// impl because neither this crate nor the caller owns the type, or simply
+/// doesn't want one).
+#[cfg(feature = "yaml")]
+#[derive(Component, Default)]
+struct ForeignLabel(String);
+
+#[cfg(feature = "yaml")]
+#[test]
+fn closure_writer_drives_foreign_component() {
+    let mut app = test_app();
+    app.register_i18n_writer::<ForeignLabel, _>(|label, text| label.0 = text);
+    advance_until_ready(&mut app);
+
+    let id = spawn_text(&mut app, (I18nKey::new("hello"), ForeignLabel::default()));
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(
+        app.world().get::<ForeignLabel>(id).unwrap().0,
+        "Hello world"
+    );
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<ForeignLabel>(id).unwrap().0,
+        "こんにちは世界"
+    );
+}
+
+#[cfg(all(feature = "numbers", feature = "yaml"))]
+#[test]
+fn closure_writer_interpolates_args() {
+    let mut app = test_app();
+    app.register_i18n_writer::<ForeignLabel, _>(|label, text| label.0 = text);
+    advance_until_ready(&mut app);
+
+    let id = spawn_text(
+        &mut app,
+        (
+            I18nKey::new("messages.cats")
+                .with_num_arg("count", 2000.3)
+                .with_locale("en"),
+            ForeignLabel::default(),
+        ),
+    );
+
+    assert_eq!(
+        app.world().get::<ForeignLabel>(id).unwrap().0,
+        "You have 2,000.3 cats"
     );
 }
