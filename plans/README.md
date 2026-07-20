@@ -27,8 +27,8 @@ green in CI.
 | 007  | Warn once per missing (locale, key) | P3 | S | — | DONE (2026-07-19, cherry-picked as `a054ede`; executor worktree had forked from stale main — commit re-parented onto the branch, full gates green: 39+23+6 / 27+4+5, clippy, fmt) |
 | 008  | `I18nTarget` trait — unlock third-party text components (bevy_rich_text3d) | P2 | M | — | DONE (2026-07-19, merge `6227881` + fixup `1510cef`; quality REVISE on a non-compiling CHANGELOG example — originated in the plan text itself — fixed by builder agent; all gates green). NOTE: its README recipe was later found orphan-rule-unimplementable — superseded by 009 |
 | 009  | Feature `rich_text3d`: in-crate `I18nTarget` impl + `I18nText3dSegment` + example (fixes 008's recipe) | P1 | M | 008 | DONE (2026-07-19, commits `01ec044`+`f34ca44`, merged; example compiled against real 0.7 API without adaptation; all APPROVE, gates green incl. feature-off build) |
-| 010  | `fontmesh` feature — I18nTarget impl for bevy_fontmesh::TextMesh + example | P2 | S | 009 | TODO |
-| 011  | Closure writer registration — `I18nKey` + `register_i18n_writer` | P2 | M | — | TODO |
+| 010  | `fontmesh` feature — I18nTarget impl for bevy_fontmesh::TextMesh + example | P2 | S | 009 | DONE (2026-07-19, commit `6ed2e91`, merge `b384ae9`; executor verified TextMesh shape against published 0.6.0 source; all APPROVE after fmt fixup `e41de40`) |
+| 011  | Closure writer registration — `I18nKey` + `register_i18n_writer` | P2 | M | — | DONE (2026-07-19, commit `d57e82c`, merge `b384ae9`; macro split into @struct/@builders/@locale_body/@translate_body internal rules, existing invocations unchanged; 2 new tests incl. interpolation-through-closure; all APPROVE after fmt fixup) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 
