@@ -31,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runnable example (`examples/rich_text_3d.rs`). Only this crate, which owns
   `I18nTarget`, can provide that impl for a foreign type without hitting the
   orphan rule.
+- **`fontmesh` feature** (off by default) — `I18nTextMesh`, the `I18nTarget`
+  impl for `bevy_fontmesh`'s `TextMesh`, and a runnable example
+  (`examples/font_mesh.rs`).
 
 ### Changed
 

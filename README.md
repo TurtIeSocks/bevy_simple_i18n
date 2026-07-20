@@ -339,6 +339,34 @@ one) to add the impl.
 Note that [`I18nFont`] does not apply to `Text3d` — it styles fonts through
 `Text3dStyling`, not Bevy's `TextFont`.
 
+### Third-party text components (bevy_fontmesh)
+
+Enable the `fontmesh` feature and this crate provides `I18nTextMesh` — a
+ready-made component that drives
+[`bevy_fontmesh`](https://docs.rs/bevy_fontmesh)'s `TextMesh` through the
+full i18n pipeline (interpolation, plurals, per-entity locales), same as
+`I18nText`/`I18nText2d`/`I18nTextSpan`:
+
+```toml
+bevy_simple_i18n = { version = "...", features = ["fontmesh"] }
+```
+
+```rust,ignore
+// The translated mesh: bevy_simple_i18n keeps this entity's TextMesh in
+// sync with the "hello" key. A Mesh3d is inserted automatically; add your
+// own TextMesh alongside to set the font (and MeshMaterial3d to render it).
+commands.spawn((
+    I18nTextMesh::new("hello"),
+    TextMesh { font: asset_server.load("fonts/font.ttf"), ..default() },
+    MeshMaterial3d(materials.add(StandardMaterial::default())),
+));
+```
+
+See [`examples/font_mesh.rs`](examples/font_mesh.rs) for the full runnable
+example. Same orphan-rule reasoning as `bevy_rich_text3d` above: `TextMesh`
+is bevy_fontmesh's foreign type, so only this crate (which owns
+[`I18nTarget`]) can provide that impl.
+
 ## Migrating from 0.3
 
 1. Add a manifest at `assets/locales/i18n.ron` listing your locale files (see
@@ -363,6 +391,7 @@ Note that [`I18nFont`] does not apply to `Text3d` — it styles fonts through
 | `detect`  | yes     | system-locale auto-detect (`bevy_device_lang`) |
 | `plurals` | yes     | CLDR plural forms via `with_count` (icu4x)     |
 | `rich_text3d` | no  | `I18nText3dSegment` for `bevy_rich_text3d`     |
+| `fontmesh` | no     | `I18nTextMesh` for `bevy_fontmesh`             |
 
 ## Bevy support table
 

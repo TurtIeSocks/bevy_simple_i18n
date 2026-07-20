@@ -126,6 +126,27 @@ fn rich_text3d_segment_translates_on_locale_change() {
     );
 }
 
+#[cfg(all(feature = "fontmesh", feature = "yaml"))]
+#[test]
+fn fontmesh_text_translates_on_locale_change() {
+    let mut app = ready_app();
+    let id = spawn_text(&mut app, I18nTextMesh::new("hello"));
+
+    app.world_mut().resource_mut::<I18n>().set_locale("en");
+    app.update();
+    assert_eq!(
+        app.world().get::<bevy_fontmesh::TextMesh>(id).unwrap().text,
+        "Hello world"
+    );
+
+    app.world_mut().resource_mut::<I18n>().set_locale("ja");
+    app.update();
+    assert_eq!(
+        app.world().get::<bevy_fontmesh::TextMesh>(id).unwrap().text,
+        "こんにちは世界"
+    );
+}
+
 // Several vectors assert values that v2_example.yml (later in the manifest) overrides;
 // they only hold when the YAML file actually loads, hence the `yaml` feature gates.
 

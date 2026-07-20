@@ -95,6 +95,10 @@ impl Plugin for I18nPlugin {
         #[cfg(feature = "rich_text3d")]
         app.register_type::<crate::components::I18nText3dSegment>()
             .register_i18n_component::<crate::components::I18nText3dSegment>();
+
+        #[cfg(feature = "fontmesh")]
+        app.register_type::<crate::components::I18nTextMesh>()
+            .register_i18n_component::<crate::components::I18nTextMesh>();
     }
 }
 
