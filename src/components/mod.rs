@@ -2,22 +2,28 @@ use bevy::ecs::component::Mutable;
 use bevy::prelude::Component;
 
 mod i18n_font;
+mod i18n_key;
 #[cfg(feature = "numbers")]
 mod i18n_number;
 mod i18n_text;
 mod i18n_text_2d;
 #[cfg(feature = "rich_text3d")]
 mod i18n_text_3d_segment;
+#[cfg(feature = "fontmesh")]
+mod i18n_text_mesh;
 mod i18n_text_span;
 pub(crate) mod utils;
 
 pub use i18n_font::*;
+pub use i18n_key::*;
 #[cfg(feature = "numbers")]
 pub use i18n_number::*;
 pub use i18n_text::*;
 pub use i18n_text_2d::*;
 #[cfg(feature = "rich_text3d")]
 pub use i18n_text_3d_segment::*;
+#[cfg(feature = "fontmesh")]
+pub use i18n_text_mesh::*;
 pub use i18n_text_span::*;
 
 /// A text component `bevy_simple_i18n` can write translated strings into.
@@ -93,17 +99,101 @@ pub(crate) enum InterpolationType {
     Number(#[reflect(ignore)] fixed_decimal::Decimal),
 }
 
-/// Generates an `I18nText`-shaped component: same fields, same [`I18nComponent`] impl
-/// shape, same builder methods — only the type name, the `#[require(..)]`ed target,
-/// and the struct-level rustdoc (passed in at the invocation site) differ.
+/// Generates an `I18nText`-shaped component: same fields, same builder methods,
+/// and — for the `target: $target` form — the same [`I18nComponent`] impl shape.
+/// Only the type name, the `#[require(..)]`ed target, and the struct-level
+/// rustdoc (passed in at the invocation site) differ.
+///
+/// Two public forms:
+/// - `$name, target: $target` — struct `#[require($target)]`s its render target
+///   and gets a full [`I18nComponent`] impl (`I18nText`, `I18nText2d`, …).
+/// - `$name, no_target` — no `#[require(..)]`, no [`I18nComponent`] impl;
+///   `locale`/`translate` become inherent methods instead, for a driver with
+///   no built-in render target (`I18nKey`, driving foreign components via
+///   `register_i18n_writer`).
 ///
 /// Paths inside this macro's body are fully qualified (`crate::...` / `bevy::...`)
 /// rather than relying on the invoking module's imports, since `macro_rules!` path
 /// resolution follows the definition site, not the invocation site.
 macro_rules! define_i18n_text_component {
+    // Public arm: struct requires (auto-inserts) `$target`, and implements
+    // `I18nComponent` against it. Used by every driver that owns a concrete
+    // render target (`I18nText`, `I18nText2d`, `I18nTextSpan`, the
+    // feature-gated third-party ones).
     (
         $(#[$struct_doc:meta])*
         $name:ident, target: $target:ty
+    ) => {
+        define_i18n_text_component!(@struct
+            $(#[$struct_doc])*
+            $name, require: [$target]
+        );
+
+        impl crate::components::I18nComponent for $name {
+            type Target = $target;
+
+            fn locale<'a>(&'a self, i18n: &'a crate::prelude::I18n) -> &'a str {
+                define_i18n_text_component!(@locale_body self, i18n)
+            }
+
+            fn translate(&self, i18n: &crate::prelude::I18n) -> String {
+                define_i18n_text_component!(@translate_body self, i18n)
+            }
+        }
+
+        define_i18n_text_component!(@builders $name);
+    };
+
+    // Public arm: no render target — no `#[require(..)]`, no `I18nComponent`
+    // impl. `locale`/`translate` become inherent methods with identical
+    // bodies, so a caller driving a foreign component through
+    // `register_i18n_writer` can call them directly.
+    (
+        $(#[$struct_doc:meta])*
+        $name:ident, no_target
+    ) => {
+        define_i18n_text_component!(@struct
+            $(#[$struct_doc])*
+            $name, require: []
+        );
+
+        impl $name {
+            /// Returns this component's locale: its per-entity override if one was set,
+            /// otherwise the current locale of the [`I18n`](crate::prelude::I18n) resource.
+            pub fn locale<'a>(&'a self, i18n: &'a crate::prelude::I18n) -> &'a str {
+                define_i18n_text_component!(@locale_body self, i18n)
+            }
+
+            /// Produces the translated / localized string for the resolved [`locale`](Self::locale).
+            pub fn translate(&self, i18n: &crate::prelude::I18n) -> String {
+                define_i18n_text_component!(@translate_body self, i18n)
+            }
+        }
+
+        define_i18n_text_component!(@builders $name);
+    };
+
+    (@locale_body $self:ident, $i18n:ident) => {
+        $self.locale.as_deref().unwrap_or_else(|| $i18n.current())
+    };
+
+    (@translate_body $self:ident, $i18n:ident) => {{
+        #[cfg(feature = "plurals")]
+        if let Some(count) = &$self.count {
+            return crate::components::utils::translate_plural(
+                $i18n,
+                $self.locale($i18n),
+                &$self.key,
+                &$self.args,
+                count,
+            );
+        }
+        crate::components::utils::translate_by_key($i18n, $self.locale($i18n), &$self.key, &$self.args)
+    }};
+
+    (@struct
+        $(#[$struct_doc:meta])*
+        $name:ident, require: [$target:ty]
     ) => {
         // `#[reflect(Component)]` below expands (via the `Reflect` derive) to code that
         // references `ReflectComponent` unqualified at this expansion site — bring it
@@ -126,29 +216,35 @@ macro_rules! define_i18n_text_component {
             #[reflect(ignore)]
             count: Option<fixed_decimal::Decimal>,
         }
+    };
 
-        impl crate::components::I18nComponent for $name {
-            type Target = $target;
+    (@struct
+        $(#[$struct_doc:meta])*
+        $name:ident, require: []
+    ) => {
+        // `#[reflect(Component)]` below expands (via the `Reflect` derive) to code that
+        // references `ReflectComponent` unqualified at this expansion site — bring it
+        // into scope here rather than requiring every invocation site to import it.
+        use bevy::prelude::ReflectComponent;
 
-            fn locale<'a>(&'a self, i18n: &'a crate::prelude::I18n) -> &'a str {
-                self.locale.as_deref().unwrap_or_else(|| i18n.current())
-            }
-
-            fn translate(&self, i18n: &crate::prelude::I18n) -> String {
-                #[cfg(feature = "plurals")]
-                if let Some(count) = &self.count {
-                    return crate::components::utils::translate_plural(
-                        i18n,
-                        self.locale(i18n),
-                        &self.key,
-                        &self.args,
-                        count,
-                    );
-                }
-                crate::components::utils::translate_by_key(i18n, self.locale(i18n), &self.key, &self.args)
-            }
+        $(#[$struct_doc])*
+        #[derive(bevy::prelude::Component, Default, bevy::prelude::Reflect, Debug, Clone)]
+        #[reflect(Component)]
+        pub struct $name {
+            /// Translation key for i18n
+            key: String,
+            /// Interpolation arguments for the translation key
+            args: Vec<(String, crate::components::InterpolationType)>,
+            /// Locale for this specific translation, `None` to use the global locale
+            pub(crate) locale: Option<String>,
+            /// Plural count: resolves the key to its CLDR plural form and injects `%{count}`
+            #[cfg(feature = "plurals")]
+            #[reflect(ignore)]
+            count: Option<fixed_decimal::Decimal>,
         }
+    };
 
+    (@builders $name:ident) => {
         impl $name {
             /// Creates a new component with the provided translation key
             pub fn new(str: impl Into<String>) -> Self {
