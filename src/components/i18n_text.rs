@@ -47,6 +47,9 @@ pub struct I18nText {
     key: String,
     /// Interpolation arguments for the translation key
     args: Vec<(String, InterpolationType)>,
+    /// Plural Rules
+    #[cfg(feature = "numbers")]
+    plural_rules: PluralRule,
     /// Locale for this specific translation, `None` to use the global locale
     pub(crate) locale: Option<String>,
 }
@@ -58,12 +61,20 @@ impl I18nText {
             key: str.into(),
             args: vec![],
             locale: None,
+            #[cfg(feature = "numbers")]
+            plural_rules: PluralRule::default(),
         }
     }
 
     /// Set the locale for this specific translation
     pub fn with_locale(mut self, locale: impl Into<String>) -> Self {
         self.locale = Some(locale.into());
+        self
+    }
+
+    #[cfg(feature = "numbers")]
+    pub fn with_plural_rule(mut self, rules: PluralRule) -> Self {
+        self.plural_rules = rules;
         self
     }
 
@@ -140,4 +151,24 @@ enum InterpolationType {
     String(String),
     #[cfg(feature = "numbers")]
     Number(#[reflect(ignore)] FixedDecimal),
+}
+
+#[cfg(feature = "numbers")]
+#[derive(Reflect, Default, Debug, Clone)]
+pub enum PluralRule {
+    #[default]
+    None,
+    Cardinal,
+    Ordinal,
+}
+
+#[cfg(feature = "numbers")]
+impl From<icu_plurals::PluralRuleType> for PluralRule {
+    fn from(value: icu_plurals::PluralRuleType) -> Self {
+        match value {
+            icu_plurals::PluralRuleType::Cardinal => PluralRule::Cardinal,
+            icu_plurals::PluralRuleType::Ordinal => PluralRule::Ordinal,
+            _ => PluralRule::None,
+        }
+    }
 }
