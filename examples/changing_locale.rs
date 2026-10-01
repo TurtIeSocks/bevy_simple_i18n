@@ -4,7 +4,10 @@ use bevy_simple_i18n::prelude::*;
 
 fn main() {
     App::new()
-        .add_plugins(DefaultPlugins)
+        .add_plugins(DefaultPlugins.set(bevy::log::LogPlugin {
+            level: bevy::log::Level::DEBUG,
+            ..Default::default()
+        }))
         .add_plugins(I18nPlugin)
         .add_systems(Startup, setup)
         .add_systems(Update, button_system)
@@ -41,7 +44,7 @@ fn setup(mut commands: Commands, i18n_res: Res<I18n>) {
                             font_size: 40.0,
                             ..default()
                         },
-                        I18nFont::new("NotoSans"),
+                        // I18nFont::new("NotoSans"),
                         TextLayout::new_with_justify(JustifyText::Center),
                     ));
                     parent.spawn((
@@ -95,7 +98,7 @@ fn setup(mut commands: Commands, i18n_res: Res<I18n>) {
                             font_size: 40.0,
                             ..default()
                         },
-                        I18nFont::new("NotoSans"),
+                        // I18nFont::new("NotoSans"),
                         TextLayout::new_with_justify(JustifyText::Center),
                     ));
                     parent.spawn((
